@@ -145,20 +145,20 @@ export default function App() {
       return (
         <Wrapper>
           <div className="p-6 bg-white min-h-screen">
-            <h2 className="text-[22px] font-aboreto text-gray-900 mb-5 text-center">Wallet</h2>
-            <div className="mb-6 text-center">
-              <p className="text-sm text-gray-500 font-abeezee mb-1">Your balance</p>
-              <div className="text-[28px] font-bold text-gray-900 flex items-center justify-center gap-2">
-                <img src="/ton-icon.svg" alt="TON" className="w-6 h-6" />
-                {walletData?.balance ?? "..."}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-[18px] font-aboreto text-gray-900">TOKEN ASSETS</h2>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-abeezee text-gray-500">Balance: {walletData?.balance ?? "..."}</span>
+                {userPhoto && (
+                  <img
+                    src={userPhoto}
+                    alt="User Avatar"
+                    className="w-8 h-8 rounded-full border border-gray-300 cursor-pointer"
+                    onClick={() => setScreen("account")}
+                  />
+                )}
               </div>
             </div>
-            <button
-              className="text-blue-600 text-sm underline mb-4 mx-auto block"
-              onClick={() => setScreen("account")}
-            >
-              Account
-            </button>
             <div className="grid gap-3">
               {walletData?.tokens?.map(token => (
                 <div key={token.id} className="bg-white rounded-2xl px-4 py-3 shadow border border-gray-200 flex items-center justify-between">
