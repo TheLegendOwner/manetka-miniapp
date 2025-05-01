@@ -1,0 +1,9 @@
+{
+  "manifest_version": "0.1",
+  "name": "MANETKA Wallet",
+  "url": "http://192.168.2.9:3000",
+  "icon_url": "http://192.168.2.9:3000/logo.png",
+  "bridge_url": "https://bridge.tonapi.io/bridge",
+  "terms_of_use_url": "http://192.168.2.9:3000/terms.html",
+  "privacy_policy_url": "http://192.168.2.9:3000/privacy.html"
+}
