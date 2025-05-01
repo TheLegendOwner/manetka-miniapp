@@ -29,7 +29,7 @@ export default function App() {
       const tgUserId = tgUser?.id || 404231632;
       setUserId(tgUserId);
       setUserName(tgUser?.first_name || "User");
-      setUserPhoto(tgUser?.photo_url || null);
+      setUserPhoto(tgUser?.photo_url || "/default-avatar.png");
 
       if (!connectorRef.current) {
         const c = new TonConnectUI({
@@ -149,14 +149,12 @@ export default function App() {
               <h2 className="text-[18px] font-aboreto text-gray-900">TOKEN ASSETS</h2>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-abeezee text-gray-500">Balance: {walletData?.balance ?? "..."}</span>
-                {userPhoto && (
-                  <img
-                    src={userPhoto}
-                    alt="User Avatar"
-                    className="w-8 h-8 rounded-full border border-gray-300 cursor-pointer"
-                    onClick={() => setScreen("account")}
-                  />
-                )}
+                <img
+                  src={userPhoto || "/default-avatar.png"}
+                  alt="User Avatar"
+                  className="w-8 h-8 rounded-full border border-gray-300 cursor-pointer"
+                  onClick={() => setScreen("account")}
+                />
               </div>
             </div>
             <div className="grid gap-3">
