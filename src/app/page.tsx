@@ -21,6 +21,27 @@ export default function App() {
   const connectorRef = useRef<TonConnectUI | null>(null);
 
   useEffect(() => {
+    const validateTelegramInitData = async () => {
+      const tg = window.Telegram?.WebApp;
+      const initData = tg?.initData || "";
+
+      try {
+        const res = await fetch("/api/validate-initdata", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          alert("Telegram validation failed");
+          tg?.close();
+        }
+      } catch (err) {
+        console.error("Telegram initData validation failed:", err);
+        tg?.close();
+      }
+    };
+
     if (typeof window !== "undefined") {
       const tg = window.Telegram?.WebApp;
       tg?.ready();
@@ -30,6 +51,8 @@ export default function App() {
       setUserId(tgUserId);
       setUserName(tgUser?.first_name || "User");
       setUserPhoto(tgUser?.photo_url || "/default-avatar.png");
+
+      validateTelegramInitData();
 
       if (!connectorRef.current) {
         const c = new TonConnectUI({
