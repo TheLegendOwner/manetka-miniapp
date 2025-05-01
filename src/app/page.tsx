@@ -45,6 +45,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (walletAddress && screen === "main") {
+      setScreen("wallet");
+    }
+  }, [walletAddress, screen]);
+
+  useEffect(() => {
     if (userId && screen === "wallet") {
       setWalletData({
         balance: "123.45 TON",
@@ -99,7 +105,7 @@ export default function App() {
             <div>
               <h1 className="text-3xl text-gray-900 mb-2 leading-tight font-aboreto">MANETKA WALLET</h1>
               <p className="text-gray-500 text-base font-abeezee max-w-xs">
-                All reward tokens in one place with </br> MANETKA WALLET
+                All reward tokens in one place with MANETKA WALLET
               </p>
             </div>
             <button
