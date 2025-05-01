@@ -83,7 +83,6 @@ export default function App() {
   const NavButton = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
     <button
       onClick={() => setScreen(value)}
-      disabled={value === "lottery" || value === "nfts"}
       className={`flex flex-col items-center flex-1 ${screen === value ? "text-blue-600" : "text-gray-400"}`}
     >
       <div className="w-6 h-6 mb-1">{icon}</div>
@@ -99,19 +98,16 @@ export default function App() {
             <img src="/logo.png" alt="MANETKA Logo" className="w-181 h-185 mb-4" />
             <div>
               <h1 className="text-3xl text-gray-900 mb-2 leading-tight font-aboreto">MANETKA WALLET</h1>
-              <p className="text-gray-500 text-base font-abeezee max-w-xs">All reward tokens in one place with MANETKA WALLET</p>
+              <p className="text-gray-500 text-base font-abeezee max-w-xs">
+                All reward tokens in one place with </br> MANETKA WALLET
+              </p>
             </div>
             <button
               onClick={async () => {
-                console.log("Connect button clicked");
                 setIsConnecting(true);
                 try {
                   if (connectorRef.current) {
-                    console.log("Connector available, opening wallet...");
                     await connectorRef.current.connectWallet();
-                  } else {
-                    console.warn("TonConnect not available. Skipping wallet connection (DEV MODE).");
-                    console.log("Switching to Wallet screen manually");
                   }
                   setScreen("wallet");
                 } catch (err) {
@@ -186,7 +182,76 @@ export default function App() {
       );
     }
 
-    // остальные экраны не изменены
+    if (screen === "account") {
+      return (
+        <Wrapper>
+          <div className="p-6 bg-white min-h-screen space-y-4">
+            <h2 className="text-xl font-bold text-gray-800">Account Info</h2>
+            <p className="text-gray-600">User ID: {userId}</p>
+            {walletAddress && <p className="text-gray-600 break-all">Wallet: {walletAddress}</p>}
+            <button onClick={() => setScreen("wallet")} className="text-sm text-blue-600 underline">Back</button>
+          </div>
+        </Wrapper>
+      );
+    }
+
+    if (screen === "refs") {
+      return (
+        <Wrapper>
+          <div className="p-6 bg-white min-h-screen space-y-4">
+            <h2 className="text-xl font-bold text-gray-800">Your Referrals</h2>
+            <p className="text-sm text-gray-600">Share your referral link:</p>
+            <input
+              readOnly
+              value={`https://t.me/yourbot?start=${userId}`}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+            <ul className="space-y-2">
+              {refs.map(ref => (
+                <li key={ref.id} className="bg-gray-100 p-2 rounded-md text-sm">{ref.username}</li>
+              ))}
+            </ul>
+          </div>
+        </Wrapper>
+      );
+    }
+
+    if (screen === "social") {
+      return (
+        <Wrapper>
+          <div className="p-6 bg-white min-h-screen space-y-4">
+            <h2 className="text-xl font-bold text-gray-800">Follow us</h2>
+            <div className="space-y-3">
+              <a href="https://t.me/manetka" target="_blank" className="block text-blue-600 underline">Telegram</a>
+              <a href="https://twitter.com/manetka" target="_blank" className="block text-blue-600 underline">Twitter</a>
+            </div>
+          </div>
+        </Wrapper>
+      );
+    }
+
+    if (screen === "lottery") {
+      return (
+        <Wrapper>
+          <div className="p-6 bg-white min-h-screen text-center">
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Lottery</h2>
+            <p className="text-gray-600">Coming soon...</p>
+          </div>
+        </Wrapper>
+      );
+    }
+
+    if (screen === "nfts") {
+      return (
+        <Wrapper>
+          <div className="p-6 bg-white min-h-screen text-center">
+            <h2 className="text-xl font-bold text-gray-800 mb-2">NFTs</h2>
+            <p className="text-gray-600">Coming soon...</p>
+          </div>
+        </Wrapper>
+      );
+    }
+
     return <Wrapper><p className="p-4">Page not found</p></Wrapper>;
   };
 
@@ -206,4 +271,4 @@ export default function App() {
       </div>
     </div>
   );
-}
+} // конец компонента App
