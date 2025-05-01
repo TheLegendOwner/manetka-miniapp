@@ -1,9 +1,9 @@
 {
-  "manifest_version": "0.1",
+  "manifest_version": "1",
   "name": "MANETKA Wallet",
-  "url": "http://manetka-miniapp-rufp.vercel.app",
-  "icon_url": "http://manetka-miniapp-rufp.vercel.app/logo.png",
+  "url": "https://manetka-miniapp-rufp.vercel.app",
+  "icon_url": "https://manetka-miniapp-rufp.vercel.app/logo.png",
   "bridge_url": "https://bridge.tonapi.io/bridge",
-  "terms_of_use_url": "http://manetka-miniapp-rufp.vercel.app/terms.html",
-  "privacy_policy_url": "http://manetka-miniapp-rufp.vercel.app/privacy.html"
+  "terms_of_use_url": "https://manetka-miniapp-rufp.vercel.app/terms.html",
+  "privacy_policy_url": "https://manetka-miniapp-rufp.vercel.app/privacy.html"
 }
