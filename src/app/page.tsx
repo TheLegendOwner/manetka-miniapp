@@ -33,7 +33,7 @@ export default function App() {
 
       if (!connectorRef.current) {
         const c = new TonConnectUI({
-          manifestUrl: "http://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json",
+          manifestUrl: "https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json",
           buttonRootId: "tonconnect-root"
         });
         c.onStatusChange(wallet => {
