@@ -8,7 +8,7 @@ import {
   Link2,
   ChevronLeft
 } from "lucide-react";
-import { TonConnect } from "@tonconnect/sdk";
+import { TonConnectUI } from "@tonconnect/ui";
 
 export default function App() {
   const [screen, setScreen] = useState("main");
@@ -20,7 +20,7 @@ export default function App() {
   const [refs, setRefs] = useState([]);
   const [walletAddresses, setWalletAddresses] = useState<string[]>([]);
   const [loadingTokens, setLoadingTokens] = useState(false);
-  const connectorRef = useRef<TonConnect | null>(null);
+  const connectorRef = useRef<TonConnectUI | null>(null);
 
   useEffect(() => {
     const validateTelegramInitData = async () => {
@@ -55,21 +55,20 @@ export default function App() {
       validateTelegramInitData();
 
       if (!connectorRef.current) {
-        const connector = new TonConnect({
-          manifestUrl: "https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json"
+        const c = new TonConnectUI({
+          manifestUrl: "https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json",
+          buttonRootId: "tonconnect-root"
         });
-        connector.restoreConnection();
-        connector.onStatusChange(wallet => {
+        c.onStatusChange(wallet => {
           const address = wallet?.account?.address;
           if (address && !walletAddresses.includes(address)) {
             setWalletAddresses(prev => [...prev, address]);
           }
         });
-        connectorRef.current = connector;
+        connectorRef.current = c;
       }
     }
   }, []);
-  
 useEffect(() => {
   if (walletAddresses.length > 0 && screen === "main") {
     setScreen("wallet");
