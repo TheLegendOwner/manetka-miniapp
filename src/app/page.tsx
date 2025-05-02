@@ -36,8 +36,6 @@ declare global {
 
 export {};
 
-
-
 export default function App() {
   const [screen, setScreen] = useState("main");
   const [isConnecting, setIsConnecting] = useState(false);
@@ -53,7 +51,7 @@ export default function App() {
   useEffect(() => {
     const validateTelegramInitData = async () => {
       const tg = window.Telegram?.WebApp;
-      const initData = tg && "initData" in tg ? tg.initData : "";
+      const initData = tg?.initData ?? "";
 
       try {
         const res = await fetch("/api/validate-initdata", {
