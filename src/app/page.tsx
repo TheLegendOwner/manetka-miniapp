@@ -112,12 +112,20 @@ export default function App() {
 
   const connectWallet = async () => {
     try {
-      await connectorRef.current?.connect({
+      const newConnector = new TonConnect({
+        manifestUrl: "https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json"
+      });
+      const wallet = await newConnector.connect({
         universalLink: "https://app.tonkeeper.com/ton-connect",
         bridgeUrl: "https://bridge.tonapi.io/bridge"
       });
+      const address = wallet?.account?.address;
+      if (address && !walletAddresses.includes(address)) {
+        setWalletAddresses(prev => [...prev, address]);
+        setActiveWallet(address);
+      }
     } catch (err) {
-      console.error("Wallet connect failed", err);
+      console.error("Connect another wallet failed:", err);
     }
   };
 
@@ -125,6 +133,28 @@ export default function App() {
     if (!addr) return "";
     return addr.startsWith("EQ") || addr.startsWith("UQ") ? `${addr.slice(0, 5)}...${addr.slice(-4)}` : addr;
   };
+
+  const handleWalletSwitch = (addr: string) => {
+    setActiveWallet(addr);
+  };
+
+  const renderWalletList = () => (
+    <div className="flex flex-col gap-2 mt-4">
+      {walletAddresses.map(addr => (
+        <button
+          key={addr}
+          onClick={() => handleWalletSwitch(addr)}
+          className={`px-4 py-2 rounded-xl text-sm font-mono border text-left transition-all duration-200 ${
+            activeWallet === addr
+              ? "bg-black text-white border-black"
+              : "bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
+          }`}
+        >
+          {formatTonAddress(addr)} {activeWallet === addr && <span className="ml-2 text-xs">(active)</span>}
+        </button>
+      ))}
+    </div>
+  );
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <div className="max-w-[390px] w-full mx-auto min-h-screen bg-[#f9f9f9] flex flex-col">
