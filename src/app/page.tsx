@@ -64,11 +64,9 @@ export default function App() {
         const data = await res.json();
         if (!data.ok) {
           alert("Telegram validation failed");
-          tg?.close?.();
         }
       } catch (err) {
         console.error("Telegram initData validation failed:", err);
-        tg?.close?.();
       }
     };
 
