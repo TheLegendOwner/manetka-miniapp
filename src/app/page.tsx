@@ -8,7 +8,6 @@ import {
   Link2
 } from "lucide-react";
 import { TonConnectUI } from "@tonconnect/ui";
-import "@/types/telegram";
 
 export default function App() {
   const [screen, setScreen] = useState("main");
