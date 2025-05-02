@@ -18,7 +18,7 @@ export default function App() {
   const [userPhoto, setUserPhoto] = useState(null);
   const [walletData, setWalletData] = useState(null);
   const [refs, setRefs] = useState([]);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [walletAddresses, setWalletAddresses] = useState<string[]>([]);
   const [loadingTokens, setLoadingTokens] = useState(false);
   const connectorRef = useRef<TonConnectUI | null>(null);
 
@@ -60,7 +60,10 @@ export default function App() {
           buttonRootId: "tonconnect-root"
         });
         c.onStatusChange(wallet => {
-          setWalletAddress(wallet?.account?.address ?? null);
+          const address = wallet?.account?.address;
+          if (address && !walletAddresses.includes(address)) {
+            setWalletAddresses(prev => [...prev, address]);
+          }
         });
         connectorRef.current = c;
       }
@@ -68,50 +71,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (walletAddress && screen === "main") {
+    if (walletAddresses.length > 0 && screen === "main") {
       setScreen("wallet");
     }
-  }, [walletAddress, screen]);
-
-  useEffect(() => {
-    if (userId && screen === "wallet") {
-      setLoadingTokens(true);
-      setTimeout(() => {
-        setWalletData({
-          balance: "123.45 TON",
-          tokens: [
-            {
-              id: 1,
-              name: "$MNTK",
-              logo: "/mntk-logo.png",
-              balance: "1,000 $MNTK",
-              usdValue: "$250",
-              rewards: "5.25 TON",
-              buyUrl: "https://buy.manetka.io",
-              sellUrl: "https://sell.manetka.io"
-            },
-            {
-              id: 2,
-              name: "$REWARD",
-              logo: "/reward-logo.png",
-              balance: "500 $REWARD",
-              usdValue: "$100",
-              rewards: "2.10 TON",
-              buyUrl: "https://buy.reward.io",
-              sellUrl: "https://sell.reward.io"
-            }
-          ]
-        });
-        setLoadingTokens(false);
-      }, 1000);
-    }
-    if (userId && screen === "refs") {
-      setRefs([
-        { id: 1, username: "@ref_user1" },
-        { id: 2, username: "@ref_user2" }
-      ]);
-    }
-  }, [userId, screen]);
+  }, [walletAddresses, screen]);
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <div className="max-w-[390px] w-full mx-auto min-h-screen bg-[#f9f9f9] flex flex-col">
@@ -130,6 +93,10 @@ export default function App() {
     </button>
   );
 
+  const formatTonAddress = (addr: string) => {
+    if (!addr) return "";
+    return addr.startsWith("EQ") || addr.startsWith("UQ") ? `${addr.slice(0, 5)}...${addr.slice(-4)}` : addr;
+  };
 
   const renderScreen = () => {
     if (screen === "main") {
@@ -225,12 +192,14 @@ export default function App() {
       );
     }
 
-    if (screen === "account") {
+   if (screen === "account") {
       return (
         <Wrapper>
           <div className="p-6 bg-white min-h-screen">
-            <div className="flex items-center justify-between mb-4">
-              <button onClick={() => setScreen("wallet")}> <ChevronLeft className="w-5 h-5" /></button>
+            <div className="flex items-center justify-between mb-6">
+              <button onClick={() => setScreen("wallet")} className="text-gray-700">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
               <h2 className="text-base font-aboreto text-gray-900">ACCOUNT</h2>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-abeezee">EN</span>
@@ -241,26 +210,34 @@ export default function App() {
                 <span className="text-xs font-abeezee text-gray-400">RU</span>
               </div>
             </div>
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-gray-600">Connected TON wallets:</h3>
-              {walletAddress && (
-                <div className="mt-2 flex items-center justify-between border border-gray-200 rounded-lg px-4 py-2">
-                  <span className="text-sm font-mono text-gray-800 break-all">{walletAddress}</span>
+
+            <div className="flex items-center gap-4 mb-6">
+              <img src={userPhoto || "/default-avatar.png"} alt="User Avatar" className="w-16 h-16 rounded-full border border-gray-300" />
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">{userName}</h2>
+                <p className="text-sm text-gray-500 font-mono">ID: {userId}</p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="text-sm font-semibold text-gray-600 mb-2">Connected TON wallets:</div>
+              {walletAddresses.map((addr, i) => (
+                <div key={i} className="mt-2 flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3 shadow-sm transition hover:shadow-md">
+                  <span className="text-sm font-mono text-gray-800 break-all">{formatTonAddress(addr)}</span>
                   <button
                     onClick={async () => {
                       const confirmed = window.confirm("Disconnect this wallet?");
                       if (confirmed && connectorRef.current) {
                         await connectorRef.current.disconnect();
-                        setWalletAddress(null);
-                        setScreen("main");
+                        setWalletAddresses(walletAddresses.filter(a => a !== addr));
                       }
                     }}
-                    className="text-white text-xs bg-black px-3 py-1 rounded-full hover:opacity-80"
+                    className="text-white text-xs bg-black px-4 py-1.5 rounded-full hover:bg-gray-800 transition"
                   >
                     Disconnect
                   </button>
                 </div>
-              )}
+              ))}
               <button
                 onClick={async () => {
                   try {
@@ -269,17 +246,10 @@ export default function App() {
                     console.error("Connect another wallet failed:", err);
                   }
                 }}
-                className="mt-4 text-sm text-blue-600 underline"
+                className="mt-6 w-full bg-[#EBB923] hover:bg-yellow-400 text-gray-900 text-sm font-medium px-4 py-2 rounded-full shadow text-center transition"
               >
                 Connect one more TON wallet
               </button>
-            </div>
-            <div className="flex items-center gap-4 mt-6">
-              <img src={userPhoto || "/default-avatar.png"} alt="User Avatar" className="w-16 h-16 rounded-full border border-gray-300" />
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">{userName}</h2>
-                <p className="text-sm text-gray-500 font-mono">ID: {userId}</p>
-              </div>
             </div>
           </div>
         </Wrapper>
