@@ -112,17 +112,10 @@ export default function App() {
 
   const connectWallet = async () => {
     try {
-      const result = await connectorRef.current?.connect({
+      await connectorRef.current?.connect({
         universalLink: "https://app.tonkeeper.com/ton-connect",
         bridgeUrl: "https://bridge.tonapi.io/bridge"
       });
-      if (result && result.account?.address) {
-        const address = result.account.address;
-        if (!walletAddresses.includes(address)) {
-          setWalletAddresses(prev => [...prev, address]);
-          setActiveWallet(address);
-        }
-      }
     } catch (err) {
       console.error("Wallet connect failed", err);
     }
