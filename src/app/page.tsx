@@ -18,6 +18,7 @@ export default function App() {
   const [walletData, setWalletData] = useState(null);
   const [refs, setRefs] = useState([]);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [loadingTokens, setLoadingTokens] = useState(false);
   const connectorRef = useRef<TonConnectUI | null>(null);
 
   useEffect(() => {
@@ -75,25 +76,35 @@ export default function App() {
 
   useEffect(() => {
     if (userId && screen === "wallet") {
-      setWalletData({
-        balance: "123.45 TON",
-        tokens: [
-          {
-            id: 1,
-            name: "$MNTK",
-            balance: "1000",
-            buyUrl: "https://buy.manetka.io",
-            sellUrl: "https://sell.manetka.io"
-          },
-          {
-            id: 2,
-            name: "$REWARD",
-            balance: "500",
-            buyUrl: "https://buy.reward.io",
-            sellUrl: "https://sell.reward.io"
-          }
-        ]
-      });
+      setLoadingTokens(true);
+      setTimeout(() => {
+        setWalletData({
+          balance: "123.45 TON",
+          tokens: [
+            {
+              id: 1,
+              name: "$MNTK",
+              logo: "/mntk-logo.png",
+              balance: "1,000 $MNTK",
+              usdValue: "$250",
+              rewards: "5.25 TON",
+              buyUrl: "https://buy.manetka.io",
+              sellUrl: "https://sell.manetka.io"
+            },
+            {
+              id: 2,
+              name: "$REWARD",
+              logo: "/reward-logo.png",
+              balance: "500 $REWARD",
+              usdValue: "$100",
+              rewards: "2.10 TON",
+              buyUrl: "https://buy.reward.io",
+              sellUrl: "https://sell.reward.io"
+            }
+          ]
+        });
+        setLoadingTokens(false);
+      }, 1000);
     }
     if (userId && screen === "refs") {
       setRefs([
@@ -120,50 +131,6 @@ export default function App() {
   );
 
   const renderScreen = () => {
-    if (screen === "main") {
-      return (
-        <Wrapper>
-          <div className="p-8 flex flex-col items-center justify-center text-center h-full gap-6">
-            <img src="/logo.png" alt="MANETKA Logo" className="w-181 h-185 mb-4" />
-            <div>
-              <h1 className="text-3xl text-gray-900 mb-2 leading-tight font-aboreto">MANETKA WALLET</h1>
-              <p className="text-gray-500 text-base font-abeezee max-w-xs">
-                All reward tokens in one place with MANETKA WALLET
-              </p>
-            </div>
-            <button
-              onClick={async () => {
-                setIsConnecting(true);
-                try {
-                  if (connectorRef.current) {
-                    await connectorRef.current.connectWallet();
-                  }
-                  setScreen("wallet");
-                } catch (err) {
-                  console.error("Wallet connection failed", err);
-                } finally {
-                  setIsConnecting(false);
-                }
-              }}
-              className="bg-[#EBB923] hover:bg-yellow-400 text-gray-900 text-lg px-8 py-3 rounded-full shadow-lg flex items-center justify-center gap-2 w-full max-w-xs"
-            >
-              {isConnecting ? "Connecting..." : "Connect your TON wallet"}
-              {isConnecting && (
-                <svg className="animate-spin ml-2 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
-              )}
-            </button>
-            {walletAddress && (
-              <p className="text-xs text-gray-400 mt-2">Connected: {walletAddress}</p>
-            )}
-            <div id="tonconnect-root" className="mt-4" />
-          </div>
-        </Wrapper>
-      );
-    }
-
     if (screen === "wallet") {
       return (
         <Wrapper>
@@ -180,30 +147,46 @@ export default function App() {
                 />
               </div>
             </div>
-            <div className="grid gap-3">
-              {walletData?.tokens?.map(token => (
-                <div key={token.id} className="bg-white rounded-2xl px-4 py-3 shadow border border-gray-200 flex items-center justify-between">
-                  <div>
-                    <div className="text-lg font-semibold text-gray-800 font-aboreto">{token.name}</div>
-                    <div className="text-sm text-gray-500 font-abeezee">{token.balance}</div>
+            {loadingTokens ? (
+              <div className="flex flex-col gap-4 animate-pulse">
+                {[1, 2].map(i => (
+                  <div key={i} className="bg-gray-100 rounded-2xl h-24" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {walletData?.tokens?.map(token => (
+                  <div
+                    key={token.id}
+                    className="bg-white rounded-2xl p-4 shadow-md border border-gray-200 flex items-center justify-between transition-all hover:shadow-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img src={token.logo} alt={token.name} className="w-10 h-10 rounded-full" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-gray-900 font-aboreto">{token.name}</span>
+                        <span className="text-xs text-gray-500 font-abeezee">Amount: {token.balance}</span>
+                        <span className="text-xs text-gray-400 font-abeezee">USD: {token.usdValue}</span>
+                        <span className="text-xs text-blue-500 font-abeezee">Rewards: {token.rewards}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        className="bg-[#EBB923] hover:bg-yellow-400 text-gray-900 font-semibold text-xs px-4 py-1 rounded-full"
+                        onClick={() => window.open(token.buyUrl, "_blank")}
+                      >
+                        Buy
+                      </button>
+                      <button
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold text-xs px-4 py-1 rounded-full"
+                        onClick={() => window.open(token.sellUrl, "_blank")}
+                      >
+                        Sell
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      className="bg-[#EBB923] hover:bg-yellow-400 text-gray-900 font-semibold text-sm px-4 py-1.5 rounded-full"
-                      onClick={() => window.open(token.buyUrl, "_blank")}
-                    >
-                      Buy
-                    </button>
-                    <button
-                      className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold text-sm px-4 py-1.5 rounded-full"
-                      onClick={() => window.open(token.sellUrl, "_blank")}
-                    >
-                      Sell
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </Wrapper>
       );
