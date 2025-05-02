@@ -112,18 +112,10 @@ export default function App() {
 
   const connectWallet = async () => {
     try {
-      const newConnector = new TonConnect({
-        manifestUrl: "https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json"
-      });
-      const wallet = await newConnector.connect({
+      await connectorRef.current?.connect({
         universalLink: "https://app.tonkeeper.com/ton-connect",
         bridgeUrl: "https://bridge.tonapi.io/bridge"
       });
-	const address = wallet; 
-	if (address && !walletAddresses.includes(address)) {
-	  setWalletAddresses(prev => [...prev, address]);
-	  setActiveWallet(address);
-	}
     } catch (err) {
       console.error("Connect another wallet failed:", err);
     }
@@ -276,7 +268,7 @@ export default function App() {
         <Wrapper>
           <div className="p-6 bg-white min-h-screen">
             <div className="flex items-center justify-between mb-6">
-              <button onClick={() => setScreen("wallet")} className="text-gray-700">
+              <button onClick={connectWallet} className="text-gray-700">
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <h2 className="text-base font-aboreto text-gray-900">ACCOUNT</h2>
