@@ -11,24 +11,29 @@ import { TonConnectUI } from "@tonconnect/ui";
 
 // Telegram WebApp typings
 declare global {
+  interface TelegramWebAppUser {
+    id: number;
+    first_name?: string;
+    photo_url?: string;
+  }
+
+  interface TelegramWebApp {
+    ready: () => void;
+    expand: () => void;
+    close?: () => void;
+    initData: string;
+    initDataUnsafe?: {
+      user?: TelegramWebAppUser;
+    };
+  }
+
   interface Window {
     Telegram?: {
-      WebApp?: {
-        ready: () => void;
-        expand: () => void;
-        close?: () => void;
-        initData: string;
-        initDataUnsafe?: {
-          user?: {
-            id: number;
-            first_name?: string;
-            photo_url?: string;
-          };
-        };
-      };
+      WebApp?: TelegramWebApp;
     };
   }
 }
+
 
 export default function App() {
   const [screen, setScreen] = useState("main");
