@@ -158,6 +158,35 @@ export default function App() {
   );
 
   const renderScreen = () => {
+if (screen === "main") {
+  return (
+    <Wrapper>
+      <div className="p-6 bg-white min-h-screen text-center flex flex-col justify-center items-center gap-6">
+        <img src="/logo.png" alt="Logo" className="w-24 h-24" />
+        <div>
+          <h1 className="text-2xl font-aboreto text-gray-900 mb-2">MANETKA WALLET</h1>
+          <p className="text-sm text-gray-600 font-abeezee">All reward tokens in one place with MANETKA WALLET</p>
+        </div>
+        <button
+          className="bg-[#EBB923] hover:bg-yellow-400 text-gray-900 font-semibold text-sm px-6 py-2 rounded-full shadow"
+          onClick={async () => {
+            try {
+              if (connectorRef.current) {
+                await connectorRef.current.connectWallet();
+              }
+            } catch (err) {
+              console.error("Wallet connect failed", err);
+            }
+          }}
+        >
+          Connect your TON wallet
+        </button>
+      </div>
+    </Wrapper>
+  );
+}
+
+    
     if (screen === "wallet") {
       return (
         <Wrapper>
