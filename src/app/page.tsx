@@ -115,6 +115,7 @@ export default function App() {
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <div className="max-w-[390px] w-full mx-auto min-h-screen bg-[#f9f9f9] flex flex-col">
       {children}
+      <div id="tonconnect-root" className="hidden" />
     </div>
   );
 

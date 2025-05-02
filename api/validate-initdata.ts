@@ -12,11 +12,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // 🔐 Здесь должна быть валидация подписи initData с помощью BOT_TOKEN
-    // Сейчас просто возвращаем OK для примера
+    // Здесь могла бы быть настоящая валидация initData
     return res.status(200).json({ ok: true });
   } catch (error) {
-    console.error("Validation error:", error);
     return res.status(500).json({ ok: false, error: "Internal Server Error" });
   }
 }
