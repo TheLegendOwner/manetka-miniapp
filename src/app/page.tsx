@@ -21,7 +21,7 @@ declare global {
     ready: () => void;
     expand: () => void;
     close?: () => void;
-    initData: string; 
+    initData: string;
     initDataUnsafe?: {
       user?: TelegramWebAppUser;
     };
@@ -51,7 +51,7 @@ export default function App() {
   useEffect(() => {
     const validateTelegramInitData = async () => {
       const tg = window.Telegram?.WebApp;
-      const initData = tg?.initData || "";
+      const initData = tg?.initData ?? "";
 
       try {
         const res = await fetch("/api/validate-initdata", {
