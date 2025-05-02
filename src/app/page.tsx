@@ -119,11 +119,11 @@ export default function App() {
         universalLink: "https://app.tonkeeper.com/ton-connect",
         bridgeUrl: "https://bridge.tonapi.io/bridge"
       });
-const address = wallet; 
-if (address && !walletAddresses.includes(address)) {
-  setWalletAddresses(prev => [...prev, address]);
-  setActiveWallet(address);
-}
+	const address = wallet; 
+	if (address && !walletAddresses.includes(address)) {
+	  setWalletAddresses(prev => [...prev, address]);
+	  setActiveWallet(address);
+	}
     } catch (err) {
       console.error("Connect another wallet failed:", err);
     }
