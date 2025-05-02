@@ -141,8 +141,6 @@ export default function App() {
     </button>
   );
 
-
-
   const renderScreen = () => {
     if (screen === "main") {
       return (
