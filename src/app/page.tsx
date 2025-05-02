@@ -119,7 +119,7 @@ export default function App() {
         universalLink: "https://app.tonkeeper.com/ton-connect",
         bridgeUrl: "https://bridge.tonapi.io/bridge"
       });
-      const address = wallet?.account?.address;
+      const address = typeof wallet === "string" ? wallet : "";
       if (address && !walletAddresses.includes(address)) {
         setWalletAddresses(prev => [...prev, address]);
         setActiveWallet(address);
