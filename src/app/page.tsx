@@ -158,7 +158,11 @@ export default function App() {
               onClick={async () => {
                 try {
                   if (connectorRef.current) {
-                    await connectorRef.current.connect();
+                    await connectorRef.current.connect({
+  universalLink: "https://app.tonkeeper.com/ton-connect",
+  bridgeUrl: "https://bridge.tonapi.io/bridge"
+});
+
                   }
                 } catch (err) {
                   console.error("Wallet connect failed", err);
