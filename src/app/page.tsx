@@ -151,7 +151,7 @@ useEffect(() => {
               onClick={async () => {
                 try {
                   if (connectorRef.current) {
-                    await connectorRef.current.connectWallet();
+                    await connectorRef.current.connect();
                   }
                 } catch (err) {
                   console.error("Wallet connect failed", err);
