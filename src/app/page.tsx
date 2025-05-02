@@ -9,6 +9,27 @@ import {
 } from "lucide-react";
 import { TonConnectUI } from "@tonconnect/ui";
 
+// Telegram WebApp typings
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: {
+        ready: () => void;
+        expand: () => void;
+        close?: () => void;
+        initData: string;
+        initDataUnsafe?: {
+          user?: {
+            id: number;
+            first_name?: string;
+            photo_url?: string;
+          };
+        };
+      };
+    };
+  }
+}
+
 export default function App() {
   const [screen, setScreen] = useState("main");
   const [isConnecting, setIsConnecting] = useState(false);
@@ -35,11 +56,11 @@ export default function App() {
         const data = await res.json();
         if (!data.ok) {
           alert("Telegram validation failed");
-          tg?.close();
+          tg?.close?.();
         }
       } catch (err) {
         console.error("Telegram initData validation failed:", err);
-        tg?.close();
+        tg?.close?.();
       }
     };
 
