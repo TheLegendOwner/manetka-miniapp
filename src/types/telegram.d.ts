@@ -1,20 +1,21 @@
+// src/types/telegram.d.ts
 export {};
 
 declare global {
-  interface TelegramWebAppUser {
+  interface TelegramUser {
     id: number;
     first_name?: string;
     photo_url?: string;
   }
 
   interface TelegramWebApp {
+    initData: string;
+    initDataUnsafe?: {
+      user?: TelegramUser;
+    };
     ready: () => void;
     expand: () => void;
     close?: () => void;
-    initData: string;
-    initDataUnsafe?: {
-      user?: TelegramWebAppUser;
-    };
   }
 
   interface Window {
