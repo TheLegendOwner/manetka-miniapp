@@ -13,70 +13,62 @@ import { TonConnect } from "@tonconnect/sdk";
 export default function App() {
   const [screen, setScreen] = useState("main");
   const [isConnecting, setIsConnecting] = useState(false);
-  const [userId, setUserId] = useState(null);
-  const [userName, setUserName] = useState(null);
-  const [userPhoto, setUserPhoto] = useState(null);
-  const [walletData, setWalletData] = useState(null);
-  const [refs, setRefs] = useState([]);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [userPhoto, setUserPhoto] = useState<string>("/default-avatar.png");
+  const [walletData, setWalletData] = useState<any>(null);
+  const [refs, setRefs] = useState<any[]>([]);
   const [walletAddresses, setWalletAddresses] = useState<string[]>([]);
   const [activeWallet, setActiveWallet] = useState<string | null>(null);
   const [loadingTokens, setLoadingTokens] = useState(false);
   const connectorRef = useRef<TonConnect | null>(null);
 
+  // Инициализация Telegram + TonConnect
   useEffect(() => {
-    const validateTelegramInitData = async () => {
-      const tg = window.Telegram?.WebApp;
-      const initData = tg?.initDataUnsafe?.user ? "valid" : "";
+    if (typeof window === "undefined") return;
+    const tg = window.Telegram?.WebApp;
+    tg?.ready();
+    tg?.expand();
+    const tgUser = tg?.initDataUnsafe?.user;
+    setUserId(tgUser?.id ?? 404231632);
+    setUserName(tgUser?.first_name ?? "User");
+    setUserPhoto(tgUser?.photo_url ?? "/default-avatar.png");
 
-      try {
-        const res = await fetch("/api/validate-initdata", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData })
-        });
-        const data = await res.json();
-        if (!data.ok) {
-          alert("Telegram validation failed");
-        }
-      } catch (err) {
-        console.error("Telegram initData validation failed:", err);
-      }
-    };
+    // Запрос валидации initData (пример)
+    fetch("/api/validate-initdata", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initData: tg?.initDataUnsafe ? "valid" : "" })
+    }).catch(console.error);
 
-    if (typeof window !== "undefined") {
-      const tg = window.Telegram?.WebApp;
-      tg?.ready();
-      tg?.expand();
-      const tgUser = tg?.initDataUnsafe?.user;
-      const tgUserId = tgUser?.id || 404231632;
-      setUserId(tgUserId);
-      setUserName(tgUser?.first_name || "User");
-      setUserPhoto(tgUser?.photo_url || "/default-avatar.png");
-
-      validateTelegramInitData();
-
-      if (!connectorRef.current) {
-        const connector = new TonConnect({
-          manifestUrl: "https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json"
-        });
-        connector.restoreConnection();
-        connector.onStatusChange(wallet => {
-          const address = wallet?.account?.address;
-          if (address && !walletAddresses.includes(address)) {
-            setWalletAddresses(prev => [...prev, address]);
-            setActiveWallet(address);
-          }
-        });
-        connectorRef.current = connector;
-      }
+    if (!connectorRef.current) {
+      const connector = new TonConnect({
+        manifestUrl: "https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json"
+      });
+      connector.restoreConnection();
+connector.onStatusChange(wallet => {
+  const addr = wallet?.account?.address;
+  setWalletAddresses(prev => {
+    if (addr && !prev.includes(addr)) {
+      setActiveWallet(addr);
+      return [...prev, addr];
+    }
+    return prev;
+  });
+});
+      connectorRef.current = connector;
     }
   }, []);
 
+
+
+
+
+  // Мок-данные для балансов после подключения
   useEffect(() => {
     if (walletAddresses.length > 0 && screen === "main") {
       setScreen("wallet");
     }
-
     if (walletAddresses.length > 0 && !walletData) {
       setLoadingTokens(true);
       setTimeout(() => {
@@ -110,44 +102,28 @@ export default function App() {
     }
   }, [walletAddresses, screen, walletData]);
 
+  // Функция подключения кошелька
   const connectWallet = async () => {
+    setIsConnecting(true);
     try {
       await connectorRef.current?.connect({
         universalLink: "https://app.tonkeeper.com/ton-connect",
         bridgeUrl: "https://bridge.tonapi.io/bridge"
       });
     } catch (err) {
-      console.error("Connect another wallet failed:", err);
+      console.error("Wallet connect failed", err);
+    } finally {
+      setIsConnecting(false);
     }
   };
 
-  const formatTonAddress = (addr: string) => {
-    if (!addr) return "";
-    return addr.startsWith("EQ") || addr.startsWith("UQ") ? `${addr.slice(0, 5)}...${addr.slice(-4)}` : addr;
-  };
+  // Форматирование адреса
+  const formatTonAddress = (addr: string) =>
+    addr.startsWith("EQ") || addr.startsWith("UQ")
+      ? `${addr.slice(0, 5)}...${addr.slice(-4)}`
+      : addr;
 
-  const handleWalletSwitch = (addr: string) => {
-    setActiveWallet(addr);
-  };
-
-  const renderWalletList = () => (
-    <div className="flex flex-col gap-2 mt-4">
-      {walletAddresses.map(addr => (
-        <button
-          key={addr}
-          onClick={() => handleWalletSwitch(addr)}
-          className={`px-4 py-2 rounded-xl text-sm font-mono border text-left transition-all duration-200 ${
-            activeWallet === addr
-              ? "bg-black text-white border-black"
-              : "bg-white text-gray-800 border-gray-300 hover:bg-gray-50"
-          }`}
-        >
-          {formatTonAddress(addr)} {activeWallet === addr && <span className="ml-2 text-xs">(active)</span>}
-        </button>
-      ))}
-    </div>
-  );
-
+  // Компоненты
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <div className="max-w-[390px] w-full mx-auto min-h-screen bg-[#f9f9f9] flex flex-col">
       {children}
@@ -156,42 +132,29 @@ export default function App() {
   );
 
   const NavButton = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
-    <button
-      onClick={() => setScreen(value)}
-      className={`flex flex-col items-center flex-1 ${screen === value ? "text-blue-600" : "text-gray-400"}`}
-    >
+    <button onClick={() => setScreen(value)} className={`flex flex-col items-center flex-1 ${screen === value ? "text-blue-600" : "text-gray-400"}`}>
       <div className="w-6 h-6 mb-1">{icon}</div>
       <span className="text-[10px] font-medium leading-none">{label}</span>
     </button>
   );
 
+  // Рендер экранов
   const renderScreen = () => {
     if (screen === "main") {
       return (
         <Wrapper>
-          <div className="p-6 bg-white min-h-screen text-center flex flex-col justify-center items-center gap-6">
+          <div className="p-6 bg-white min-h-screen flex flex-col items-center justify-center text-center gap-6">
             <img src="/logo.png" alt="Logo" className="w-24 h-24" />
             <div>
               <h1 className="text-2xl font-aboreto text-gray-900 mb-2">MANETKA WALLET</h1>
               <p className="text-sm text-gray-600 font-abeezee">All reward tokens in one place with MANETKA WALLET</p>
             </div>
             <button
-              className="bg-[#EBB923] hover:bg-yellow-400 text-gray-900 font-semibold text-sm px-6 py-2 rounded-full shadow"
-              onClick={async () => {
-                try {
-                  if (connectorRef.current) {
-                    await connectorRef.current.connect({
-  universalLink: "https://app.tonkeeper.com/ton-connect",
-  bridgeUrl: "https://bridge.tonapi.io/bridge"
-});
-
-                  }
-                } catch (err) {
-                  console.error("Wallet connect failed", err);
-                }
-              }}
+              disabled={isConnecting}
+              onClick={connectWallet}
+              className="bg-[#EBB923] hover:bg-yellow-400 disabled:opacity-50 text-gray-900 font-semibold text-sm px-6 py-2 rounded-full shadow"
             >
-              Connect your TON wallet
+              {isConnecting ? "Connecting…" : "Connect your TON wallet"}
             </button>
           </div>
         </Wrapper>
@@ -202,6 +165,7 @@ export default function App() {
       return (
         <Wrapper>
           <div className="p-6 bg-white min-h-screen">
+            {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-[18px] font-aboreto text-gray-900">TOKEN ASSETS</h2>
               <div className="flex items-center gap-3">
@@ -211,13 +175,14 @@ export default function App() {
                   <div className="w-20 h-4 bg-gray-100 rounded animate-pulse" />
                 )}
                 <img
-                  src={userPhoto || "/default-avatar.png"}
+                  src={userPhoto}
                   alt="User Avatar"
                   className="w-8 h-8 rounded-full border border-gray-300 cursor-pointer"
                   onClick={() => setScreen("account")}
                 />
               </div>
             </div>
+            {/* Tokens */}
             {loadingTokens ? (
               <div className="flex flex-col gap-4 animate-pulse">
                 {[1, 2].map(i => (
@@ -226,10 +191,10 @@ export default function App() {
               </div>
             ) : (
               <div className="grid gap-4">
-                {walletData && walletData.tokens.map(token => (
+                {walletData.tokens.map((token: any) => (
                   <div
                     key={token.id}
-                    className="bg-white rounded-2xl p-4 shadow-md border border-gray-200 flex items-center justify-between transition-all hover:shadow-lg"
+                    className="bg-white rounded-2xl p-4 shadow-md border border-gray-200 flex items-center justify-between hover:shadow-lg transition"
                   >
                     <div className="flex items-center gap-3">
                       <img src={token.logo} alt={token.name} className="w-10 h-10 rounded-full" />
@@ -242,14 +207,14 @@ export default function App() {
                     </div>
                     <div className="flex flex-col gap-2">
                       <button
-                        className="bg-[#EBB923] hover:bg-yellow-400 text-gray-900 font-semibold text-xs px-4 py-1 rounded-full"
                         onClick={() => window.open(token.buyUrl, "_blank")}
+                        className="bg-[#EBB923] hover:bg-yellow-400 text-gray-900 font-semibold text-xs px-4 py-1 rounded-full"
                       >
                         Buy
                       </button>
                       <button
-                        className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold text-xs px-4 py-1 rounded-full"
                         onClick={() => window.open(token.sellUrl, "_blank")}
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold text-xs px-4 py-1 rounded-full"
                       >
                         Sell
                       </button>
@@ -263,66 +228,61 @@ export default function App() {
       );
     }
 
-   if (screen === "account") {
+    if (screen === "account") {
       return (
         <Wrapper>
           <div className="p-6 bg-white min-h-screen">
+            {/* Header */}
             <div className="flex items-center justify-between mb-6">
-              <button onClick={connectWallet} className="text-gray-700">
+              <button onClick={() => setScreen("wallet")} className="text-gray-700">
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <h2 className="text-base font-aboreto text-gray-900">ACCOUNT</h2>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-abeezee">EN</span>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" value="" className="sr-only peer" checked readOnly />
-                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                  <input type="checkbox" className="sr-only peer" checked readOnly />
+                  <div className="w-9 h-5 bg-gray-200 rounded-full peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
                 </label>
                 <span className="text-xs font-abeezee text-gray-400">RU</span>
               </div>
             </div>
-
+            {/* User info */}
             <div className="flex items-center gap-4 mb-6">
-              <img src={userPhoto || "/default-avatar.png"} alt="User Avatar" className="w-16 h-16 rounded-full border border-gray-300" />
+              <img src={userPhoto} alt="User Avatar" className="w-16 h-16 rounded-full border border-gray-300" />
               <div>
                 <h2 className="text-xl font-bold text-gray-800">{userName}</h2>
                 <p className="text-sm text-gray-500 font-mono">ID: {userId}</p>
               </div>
             </div>
-
+            {/* Connected wallets */}
             <div className="mt-6">
               <div className="text-sm font-semibold text-gray-600 mb-2">Connected TON wallets:</div>
-              {walletAddresses.map((addr, i) => (
-                <div key={i} className="mt-2 flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3 shadow-sm transition hover:shadow-md">
+              {walletAddresses.length === 0 && <p className="text-gray-500">No wallets connected.</p>}
+              {walletAddresses.map(addr => (
+                <div key={addr} className="mt-2 flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition">
                   <span className="text-sm font-mono text-gray-800 break-all">{formatTonAddress(addr)}</span>
                   <button
                     onClick={async () => {
-                      const confirmed = window.confirm("Disconnect this wallet?");
-                      if (confirmed && connectorRef.current) {
-                        await connectorRef.current.disconnect();
-                        setWalletAddresses(walletAddresses.filter(a => a !== addr));
+                      if (!confirm("Disconnect this wallet?")) return;
+                      await connectorRef.current?.disconnect();
+                      setWalletAddresses(prev => prev.filter(a => a !== addr));
+                      if (activeWallet === addr) {
+                        setActiveWallet(walletAddresses.find(a => a !== addr) || null);
                       }
                     }}
-                    className="text-white text-xs bg-black px-4 py-1.5 rounded-full hover:bg-gray-800 transition"
+                    className="text-white text-xs bg-black px-4 py-1.5 rounded-full hover:bg-gray-800"
                   >
                     Disconnect
                   </button>
                 </div>
               ))}
               <button
-                onClick={async () => {
-                  try {
-                    await connectorRef.current?.connect({
-  universalLink: "https://app.tonkeeper.com/ton-connect",
-  bridgeUrl: "https://bridge.tonapi.io/bridge"
-});
-                  } catch (err) {
-                    console.error("Connect another wallet failed:", err);
-                  }
-                }}
-                className="mt-6 w-full bg-[#EBB923] hover:bg-yellow-400 text-gray-900 text-sm font-medium px-4 py-2 rounded-full shadow text-center transition"
+                disabled={isConnecting}
+                onClick={connectWallet}
+                className="mt-6 w-full bg-[#EBB923] hover:bg-yellow-400 disabled:opacity-50 text-gray-900 text-sm font-medium px-4 py-2 rounded-full shadow transition"
               >
-                Connect one more TON wallet
+                {isConnecting ? "Connecting…" : "Connect one more TON wallet"}
               </button>
             </div>
           </div>
@@ -387,7 +347,7 @@ export default function App() {
       );
     }
 
-    return <Wrapper><p className="p-4">Page not found</p></Wrapper>;
+return <Wrapper><p className="p-4">Page not found</p></Wrapper>;
   };
 
   return (
@@ -406,4 +366,4 @@ export default function App() {
       </div>
     </div>
   );
-} // конец компонента App
+}
