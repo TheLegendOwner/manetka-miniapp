@@ -19,6 +19,7 @@ export default function App() {
   const [walletData, setWalletData] = useState(null);
   const [refs, setRefs] = useState([]);
   const [walletAddresses, setWalletAddresses] = useState<string[]>([]);
+  const [activeWallet, setActiveWallet] = useState<string | null>(null);
   const [loadingTokens, setLoadingTokens] = useState(false);
   const connectorRef = useRef<TonConnect | null>(null);
 
@@ -63,6 +64,7 @@ export default function App() {
           const address = wallet?.account?.address;
           if (address && !walletAddresses.includes(address)) {
             setWalletAddresses(prev => [...prev, address]);
+            setActiveWallet(address);
           }
         });
         connectorRef.current = connector;
@@ -110,10 +112,17 @@ export default function App() {
 
   const connectWallet = async () => {
     try {
-      await connectorRef.current?.connect({
+      const result = await connectorRef.current?.connect({
         universalLink: "https://app.tonkeeper.com/ton-connect",
         bridgeUrl: "https://bridge.tonapi.io/bridge"
       });
+      if (result && result.account?.address) {
+        const address = result.account.address;
+        if (!walletAddresses.includes(address)) {
+          setWalletAddresses(prev => [...prev, address]);
+          setActiveWallet(address);
+        }
+      }
     } catch (err) {
       console.error("Wallet connect failed", err);
     }
