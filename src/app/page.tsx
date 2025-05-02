@@ -53,7 +53,7 @@ export default function App() {
   useEffect(() => {
     const validateTelegramInitData = async () => {
       const tg = window.Telegram?.WebApp;
-      const initData = tg?.initData || "";
+      const initData = tg && "initData" in tg ? tg.initData : "";
 
       try {
         const res = await fetch("/api/validate-initdata", {
