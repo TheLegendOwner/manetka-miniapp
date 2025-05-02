@@ -8,33 +8,7 @@ import {
   Link2
 } from "lucide-react";
 import { TonConnectUI } from "@tonconnect/ui";
-
-// Telegram WebApp typings
-declare global {
-  interface TelegramWebAppUser {
-    id: number;
-    first_name?: string;
-    photo_url?: string;
-  }
-
-  interface TelegramWebApp {
-    ready: () => void;
-    expand: () => void;
-    close?: () => void;
-    initData: string;
-    initDataUnsafe?: {
-      user?: TelegramWebAppUser;
-    };
-  }
-
-  interface TelegramWindow extends Window {
-    Telegram?: {
-      WebApp?: TelegramWebApp;
-    };
-  }
-}
-
-export {};
+import "@/types/telegram";
 
 export default function App() {
   const [screen, setScreen] = useState("main");
