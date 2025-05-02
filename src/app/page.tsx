@@ -69,6 +69,43 @@ export default function App() {
       }
     }
   }, []);
+useEffect(() => {
+  if (walletAddresses.length > 0 && screen === "main") {
+    setScreen("wallet");
+  }
+
+  if (walletAddresses.length > 0 && !walletData) {
+    setLoadingTokens(true);
+    setTimeout(() => {
+      setWalletData({
+        balance: "123.45 TON",
+        tokens: [
+          {
+            id: 1,
+            name: "$MNTK",
+            balance: "1000",
+            usdValue: "$150.00",
+            rewards: "12.3 TON",
+            logo: "/mntk-logo.png",
+            buyUrl: "https://buy.manetka.io",
+            sellUrl: "https://sell.manetka.io"
+          },
+          {
+            id: 2,
+            name: "$REWARD",
+            balance: "500",
+            usdValue: "$50.00",
+            rewards: "5 TON",
+            logo: "/reward-logo.png",
+            buyUrl: "https://buy.reward.io",
+            sellUrl: "https://sell.reward.io"
+          }
+        ]
+      });
+      setLoadingTokens(false);
+    }, 1000);
+  }
+}, [walletAddresses, screen, walletData]);
 
   useEffect(() => {
     if (walletAddresses.length > 0 && screen === "main") {
