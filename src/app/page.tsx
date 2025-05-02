@@ -21,18 +21,21 @@ declare global {
     ready: () => void;
     expand: () => void;
     close?: () => void;
-    initData: string;
+    initData?: string;
     initDataUnsafe?: {
       user?: TelegramWebAppUser;
     };
   }
 
-  interface Window {
+  interface TelegramWindow extends Window {
     Telegram?: {
       WebApp?: TelegramWebApp;
     };
   }
 }
+
+export {};
+
 
 
 export default function App() {
