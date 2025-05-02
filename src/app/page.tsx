@@ -130,35 +130,34 @@ export default function App() {
   );
 
   const renderScreen = () => {
-if (screen === "main") {
-  return (
-    <Wrapper>
-      <div className="p-6 bg-white min-h-screen text-center flex flex-col justify-center items-center gap-6">
-        <img src="/logo.png" alt="Logo" className="w-24 h-24" />
-        <div>
-          <h1 className="text-2xl font-aboreto text-gray-900 mb-2">MANETKA WALLET</h1>
-          <p className="text-sm text-gray-600 font-abeezee">All reward tokens in one place with MANETKA WALLET</p>
-        </div>
-        <button
-          className="bg-[#EBB923] hover:bg-yellow-400 text-gray-900 font-semibold text-sm px-6 py-2 rounded-full shadow"
-          onClick={async () => {
-            try {
-              if (connectorRef.current) {
-                await connectorRef.current.connectWallet();
-              }
-            } catch (err) {
-              console.error("Wallet connect failed", err);
-            }
-          }}
-        >
-          Connect your TON wallet
-        </button>
-      </div>
-    </Wrapper>
-  );
-}
+    if (screen === "main") {
+      return (
+        <Wrapper>
+          <div className="p-6 bg-white min-h-screen text-center flex flex-col justify-center items-center gap-6">
+            <img src="/logo.png" alt="Logo" className="w-24 h-24" />
+            <div>
+              <h1 className="text-2xl font-aboreto text-gray-900 mb-2">MANETKA WALLET</h1>
+              <p className="text-sm text-gray-600 font-abeezee">All reward tokens in one place with MANETKA WALLET</p>
+            </div>
+            <button
+              className="bg-[#EBB923] hover:bg-yellow-400 text-gray-900 font-semibold text-sm px-6 py-2 rounded-full shadow"
+              onClick={async () => {
+                try {
+                  if (connectorRef.current) {
+                    await connectorRef.current.connectWallet();
+                  }
+                } catch (err) {
+                  console.error("Wallet connect failed", err);
+                }
+              }}
+            >
+              Connect your TON wallet
+            </button>
+          </div>
+        </Wrapper>
+      );
+    }
 
-    
     if (screen === "wallet") {
       return (
         <Wrapper>
@@ -166,12 +165,11 @@ if (screen === "main") {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-[18px] font-aboreto text-gray-900">TOKEN ASSETS</h2>
               <div className="flex items-center gap-3">
-              {walletData ? (
-  <span className="text-xs font-abeezee text-gray-500">Balance: {walletData.balance}</span>
-) : (
-  <div className="w-20 h-4 bg-gray-100 rounded animate-pulse" />
-)}
-
+                {walletData ? (
+                  <span className="text-xs font-abeezee text-gray-500">Balance: {walletData.balance}</span>
+                ) : (
+                  <div className="w-20 h-4 bg-gray-100 rounded animate-pulse" />
+                )}
                 <img
                   src={userPhoto || "/default-avatar.png"}
                   alt="User Avatar"
@@ -228,11 +226,50 @@ if (screen === "main") {
     if (screen === "account") {
       return (
         <Wrapper>
-          <div className="p-6 bg-white min-h-screen space-y-4">
-            <h2 className="text-xl font-bold text-gray-800">Account Info</h2>
-            <p className="text-gray-600">User ID: {userId}</p>
-            {walletAddress && <p className="text-gray-600 break-all">Wallet: {walletAddress}</p>}
-            <button onClick={() => setScreen("wallet")} className="text-sm text-blue-600 underline">Back</button>
+          <div className="p-6 bg-white min-h-screen">
+            <div className="flex items-center gap-4 mb-6">
+              <img src={userPhoto || "/default-avatar.png"} alt="User Avatar" className="w-16 h-16 rounded-full border border-gray-300" />
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">{userName}</h2>
+                <p className="text-sm text-gray-500 font-mono">ID: {userId}</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {walletAddress && (
+                <div>
+                  <p className="text-sm text-gray-500">TON Wallet</p>
+                  <p className="text-sm font-mono text-gray-800 break-all">{walletAddress}</p>
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(walletAddress ?? "");
+                  alert("Wallet address copied");
+                }}
+                className="text-xs text-blue-600 underline"
+              >
+                Copy address
+              </button>
+              <button
+                onClick={async () => {
+                  const confirmed = window.confirm("Disconnect wallet?");
+                  if (confirmed && connectorRef.current) {
+                    await connectorRef.current.disconnect();
+                    setWalletAddress(null);
+                    setScreen("main");
+                  }
+                }}
+                className="mt-4 text-sm text-red-600 underline"
+              >
+                Disconnect Wallet
+              </button>
+              <button
+                onClick={() => setScreen("wallet")}
+                className="mt-4 text-sm text-blue-600 underline"
+              >
+                Back
+              </button>
+            </div>
           </div>
         </Wrapper>
       );
