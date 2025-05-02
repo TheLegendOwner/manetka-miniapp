@@ -69,50 +69,60 @@ export default function App() {
       }
     }
   }, []);
-  
-useEffect(() => {
-  if (walletAddresses.length > 0 && screen === "main") {
-    setScreen("wallet");
-  }
-
-  if (walletAddresses.length > 0 && !walletData) {
-    setLoadingTokens(true);
-    setTimeout(() => {
-      setWalletData({
-        balance: "123.45 TON",
-        tokens: [
-          {
-            id: 1,
-            name: "$MNTK",
-            balance: "1000",
-            usdValue: "$150.00",
-            rewards: "12.3 TON",
-            logo: "/mntk-logo.png",
-            buyUrl: "https://buy.manetka.io",
-            sellUrl: "https://sell.manetka.io"
-          },
-          {
-            id: 2,
-            name: "$REWARD",
-            balance: "500",
-            usdValue: "$50.00",
-            rewards: "5 TON",
-            logo: "/reward-logo.png",
-            buyUrl: "https://buy.reward.io",
-            sellUrl: "https://sell.reward.io"
-          }
-        ]
-      });
-      setLoadingTokens(false);
-    }, 1000);
-  }
-}, [walletAddresses, screen, walletData]);
 
   useEffect(() => {
     if (walletAddresses.length > 0 && screen === "main") {
       setScreen("wallet");
     }
-  }, [walletAddresses, screen]);
+
+    if (walletAddresses.length > 0 && !walletData) {
+      setLoadingTokens(true);
+      setTimeout(() => {
+        setWalletData({
+          balance: "123.45 TON",
+          tokens: [
+            {
+              id: 1,
+              name: "$MNTK",
+              balance: "1000",
+              usdValue: "$150.00",
+              rewards: "12.3 TON",
+              logo: "/mntk-logo.png",
+              buyUrl: "https://buy.manetka.io",
+              sellUrl: "https://sell.manetka.io"
+            },
+            {
+              id: 2,
+              name: "$REWARD",
+              balance: "500",
+              usdValue: "$50.00",
+              rewards: "5 TON",
+              logo: "/reward-logo.png",
+              buyUrl: "https://buy.reward.io",
+              sellUrl: "https://sell.reward.io"
+            }
+          ]
+        });
+        setLoadingTokens(false);
+      }, 1000);
+    }
+  }, [walletAddresses, screen, walletData]);
+
+  const connectWallet = async () => {
+    try {
+      await connectorRef.current?.connect({
+        universalLink: "https://app.tonkeeper.com/ton-connect",
+        bridgeUrl: "https://bridge.tonapi.io/bridge"
+      });
+    } catch (err) {
+      console.error("Wallet connect failed", err);
+    }
+  };
+
+  const formatTonAddress = (addr: string) => {
+    if (!addr) return "";
+    return addr.startsWith("EQ") || addr.startsWith("UQ") ? `${addr.slice(0, 5)}...${addr.slice(-4)}` : addr;
+  };
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <div className="max-w-[390px] w-full mx-auto min-h-screen bg-[#f9f9f9] flex flex-col">
@@ -131,10 +141,7 @@ useEffect(() => {
     </button>
   );
 
-  const formatTonAddress = (addr: string) => {
-    if (!addr) return "";
-    return addr.startsWith("EQ") || addr.startsWith("UQ") ? `${addr.slice(0, 5)}...${addr.slice(-4)}` : addr;
-  };
+
 
   const renderScreen = () => {
     if (screen === "main") {
