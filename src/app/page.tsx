@@ -194,7 +194,12 @@ if (screen === "main") {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-[18px] font-aboreto text-gray-900">TOKEN ASSETS</h2>
               <div className="flex items-center gap-3">
-                <span className="text-xs font-abeezee text-gray-500">Balance: {walletData?.balance ?? "..."}</span>
+              {walletData ? (
+  <span className="text-xs font-abeezee text-gray-500">Balance: {walletData.balance}</span>
+) : (
+  <div className="w-20 h-4 bg-gray-100 rounded animate-pulse" />
+)}
+
                 <img
                   src={userPhoto || "/default-avatar.png"}
                   alt="User Avatar"
@@ -211,7 +216,7 @@ if (screen === "main") {
               </div>
             ) : (
               <div className="grid gap-4">
-                {walletData?.tokens?.map(token => (
+                {walletData && walletData.tokens.map(token => (
                   <div
                     key={token.id}
                     className="bg-white rounded-2xl p-4 shadow-md border border-gray-200 flex items-center justify-between transition-all hover:shadow-lg"
