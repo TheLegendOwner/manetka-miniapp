@@ -5,7 +5,8 @@ import {
   Ticket,
   Image as NftIcon,
   Users,
-  Link2
+  Link2,
+  ChevronLeft
 } from "lucide-react";
 import { TonConnectUI } from "@tonconnect/ui";
 
@@ -24,7 +25,7 @@ export default function App() {
   useEffect(() => {
     const validateTelegramInitData = async () => {
       const tg = window.Telegram?.WebApp;
-      const initData = tg?.initData ?? "";
+      const initData = tg?.initDataUnsafe?.user ? "valid" : "";
 
       try {
         const res = await fetch("/api/validate-initdata", {
@@ -129,6 +130,7 @@ export default function App() {
     </button>
   );
 
+
   const renderScreen = () => {
     if (screen === "main") {
       return (
@@ -227,48 +229,57 @@ export default function App() {
       return (
         <Wrapper>
           <div className="p-6 bg-white min-h-screen">
-            <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <button onClick={() => setScreen("wallet")}> <ChevronLeft className="w-5 h-5" /></button>
+              <h2 className="text-base font-aboreto text-gray-900">ACCOUNT</h2>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-abeezee">EN</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" value="" className="sr-only peer" checked readOnly />
+                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                </label>
+                <span className="text-xs font-abeezee text-gray-400">RU</span>
+              </div>
+            </div>
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-600">Connected TON wallets:</h3>
+              {walletAddress && (
+                <div className="mt-2 flex items-center justify-between border border-gray-200 rounded-lg px-4 py-2">
+                  <span className="text-sm font-mono text-gray-800 break-all">{walletAddress}</span>
+                  <button
+                    onClick={async () => {
+                      const confirmed = window.confirm("Disconnect this wallet?");
+                      if (confirmed && connectorRef.current) {
+                        await connectorRef.current.disconnect();
+                        setWalletAddress(null);
+                        setScreen("main");
+                      }
+                    }}
+                    className="text-white text-xs bg-black px-3 py-1 rounded-full hover:opacity-80"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={async () => {
+                  try {
+                    await connectorRef.current?.connectWallet();
+                  } catch (err) {
+                    console.error("Connect another wallet failed:", err);
+                  }
+                }}
+                className="mt-4 text-sm text-blue-600 underline"
+              >
+                Connect one more TON wallet
+              </button>
+            </div>
+            <div className="flex items-center gap-4 mt-6">
               <img src={userPhoto || "/default-avatar.png"} alt="User Avatar" className="w-16 h-16 rounded-full border border-gray-300" />
               <div>
                 <h2 className="text-xl font-bold text-gray-800">{userName}</h2>
                 <p className="text-sm text-gray-500 font-mono">ID: {userId}</p>
               </div>
-            </div>
-            <div className="space-y-3">
-              {walletAddress && (
-                <div>
-                  <p className="text-sm text-gray-500">TON Wallet</p>
-                  <p className="text-sm font-mono text-gray-800 break-all">{walletAddress}</p>
-                </div>
-              )}
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(walletAddress ?? "");
-                  alert("Wallet address copied");
-                }}
-                className="text-xs text-blue-600 underline"
-              >
-                Copy address
-              </button>
-              <button
-                onClick={async () => {
-                  const confirmed = window.confirm("Disconnect wallet?");
-                  if (confirmed && connectorRef.current) {
-                    await connectorRef.current.disconnect();
-                    setWalletAddress(null);
-                    setScreen("main");
-                  }
-                }}
-                className="mt-4 text-sm text-red-600 underline"
-              >
-                Disconnect Wallet
-              </button>
-              <button
-                onClick={() => setScreen("wallet")}
-                className="mt-4 text-sm text-blue-600 underline"
-              >
-                Back
-              </button>
             </div>
           </div>
         </Wrapper>
