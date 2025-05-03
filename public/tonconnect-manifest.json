@@ -1,9 +1,6 @@
 {
-  "manifest_version": "0.1",
-  "name": "MANETKA Wallet",
-  "url": "https://manetka-miniapp-rufp.vercel.app",
+  "name": "Manetka MiniApp",
+  "description": "Telegram Mini App for managing tasks",
   "iconUrl": "https://manetka-miniapp-rufp.vercel.app/logo.png",
-  "termsOfUseUrl": "https://manetka-miniapp-rufp.vercel.app/terms.html",
-  "privacyPolicyUrl": "https://manetka-miniapp-rufp.vercel.app/privacy.html",
   "permissions": ["tonClient.wallet_events"]
 }

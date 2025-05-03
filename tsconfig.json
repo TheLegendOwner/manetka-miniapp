@@ -1,9 +1,13 @@
 {
   "compilerOptions": {
-	"baseUrl": "src",
+    "baseUrl": "src",
     "paths": {
-      "@/*": ["*"],
-	  "@/types/*": ["types/*"]
+      "@/*": [
+        "*"
+      ],
+      "@/types/*": [
+        "types/*"
+      ]
     },
     "target": "es5",
     "lib": [
@@ -27,13 +31,16 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "strictNullChecks": true
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts","src", "types"
+    ".next/types/**/*.ts",
+    "src",
+    "types"
   ],
   "exclude": [
     "node_modules"
