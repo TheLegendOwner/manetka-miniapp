@@ -7,32 +7,25 @@ import { useRouter } from 'next/router';
 export default function MainPage() {
   const [tonConnectUI] = useTonConnectUI();
   const router = useRouter();
-
   const [delayedCheck, setDelayedCheck] = useState(false);
   const [connected, setConnected] = useState(false);
-
   const address = tonConnectUI?.account?.address;
 
-  // Подписка на изменения подключения кошелька
   useEffect(() => {
     const unsubscribe = tonConnectUI.onStatusChange(wallet => {
-      if (wallet?.account?.address) {
-        setConnected(true);
-      }
+      if (wallet?.account?.address) setConnected(true);
     });
     return () => unsubscribe();
   }, [tonConnectUI]);
 
-  // Первая попытка редиректа
   useEffect(() => {
-    if (typeof window !== 'undefined' && (address || connected)) {
+    if ((address || connected) && typeof window !== 'undefined') {
       router.replace('/wallet');
     } else {
       setTimeout(() => setDelayedCheck(true), 500);
     }
   }, [address, connected]);
 
-  // Вторая попытка после инициализации
   useEffect(() => {
     if (delayedCheck && (address || connected)) {
       router.replace('/wallet');
@@ -43,9 +36,7 @@ export default function MainPage() {
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
       <div className="flex flex-col items-center">
         <img src="/logo.png" alt="Manetka Logo" className="w-32 h-32 mb-6" />
-        <h1 className="text-[22px] font-bold text-gray-900 mb-2 text-center">
-          MANETKA WALLET
-        </h1>
+        <h1 className="text-[22px] font-bold text-gray-900 mb-2 text-center">MANETKA WALLET</h1>
         <p className="text-sm text-gray-600 text-center max-w-[320px] leading-snug">
           All reward tokens in one place with MANETKA WALLET
         </p>
@@ -53,12 +44,7 @@ export default function MainPage() {
 
       {!address && (
         <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
-          <button
-            onClick={() => tonConnectUI?.openModal()}
-            className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md"
-          >
-            Connect your TON Wallet
-          </button>
+          <button onClick={() => tonConnectUI.openModal()} className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md">Connect your TON Wallet</button>
         </div>
       )}
     </div>
