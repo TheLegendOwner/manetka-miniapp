@@ -1,353 +1,237 @@
-"use client";
-import { useEffect, useRef, useState } from "react";
+// src/app/page.tsx or src/pages/index.tsx
+'use client';
+
+import { useEffect, useState } from "react";
 import {
   Wallet as WalletIcon,
   Ticket,
   Image as NftIcon,
   Users,
-  Link2,
-  ChevronLeft
+  Link2
 } from "lucide-react";
 import { TonConnect } from "@tonconnect/sdk";
+import type { WalletInfo, WalletConnectionSource } from "@tonconnect/sdk";
 
-export default function App() {
-  const [screen, setScreen] = useState("main");
+// Initialize TonConnect once at module level to avoid recreations
+const connector = new TonConnect({
+  manifestUrl: "https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json"
+});
+
+export default function Page() {
+  const [screen, setScreen] = useState<
+    "main" | "selectWallet" | "wallet" | "account" | "refs" | "social" | "lottery" | "nfts"
+  >("main");
   const [isConnecting, setIsConnecting] = useState(false);
   const [userId, setUserId] = useState<number | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [userPhoto, setUserPhoto] = useState<string>("/default-avatar.png");
-  const [walletData, setWalletData] = useState<any>(null);
-  const [refs, setRefs] = useState<any[]>([]);
+  const [walletData, setWalletData] = useState<{ balance: string; tokens: any[] } | null>(null);
+  const [refsList, setRefsList] = useState<string[]>([]);
   const [walletAddresses, setWalletAddresses] = useState<string[]>([]);
   const [activeWallet, setActiveWallet] = useState<string | null>(null);
-  const [loadingTokens, setLoadingTokens] = useState(false);
-  const connectorRef = useRef<TonConnect | null>(null);
+  const [walletList, setWalletList] = useState<WalletInfo[]>([]);
 
-  // Инициализация Telegram + TonConnect
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // Telegram WebApp init
     const tg = window.Telegram?.WebApp;
     tg?.ready();
     tg?.expand();
     const tgUser = tg?.initDataUnsafe?.user;
-    setUserId(tgUser?.id ?? 404231632);
-    setUserName(tgUser?.first_name ?? "User");
+    setUserId(tgUser?.id ?? null);
+    setUserName(tgUser?.first_name ?? null);
     setUserPhoto(tgUser?.photo_url ?? "/default-avatar.png");
 
-    // Запрос валидации initData (пример)
+    // Validate initData on server – send raw initData for authentic signature verification
     fetch("/api/validate-initdata", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData: tg?.initDataUnsafe ? "valid" : "" })
+      body: JSON.stringify({ initData: tg?.initData })
     }).catch(console.error);
 
-    if (!connectorRef.current) {
-      const connector = new TonConnect({
-        manifestUrl: "https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json"
-      });
-      connector.restoreConnection();
-connector.onStatusChange(wallet => {
-  const addr = wallet?.account?.address;
-  setWalletAddresses(prev => {
-    if (addr && !prev.includes(addr)) {
-      setActiveWallet(addr);
-      return [...prev, addr];
-    }
-    return prev;
-  });
-});
-      connectorRef.current = connector;
-    }
+    // TonConnect setup
+    connector.restoreConnection();
+    connector.onStatusChange((wallet) => {
+      const addr = wallet?.account?.address;
+      if (addr) {
+        setActiveWallet(addr);
+        setWalletAddresses((prev) => (prev.includes(addr) ? prev : [...prev, addr]));
+        if (screen === "selectWallet") setScreen("wallet");
+      }
+    });
+    connector.getWallets().then((list) => setWalletList(list));
   }, []);
 
-
-
-
-
-  // Мок-данные для балансов после подключения
+  // Fetch mock balance
   useEffect(() => {
-    if (walletAddresses.length > 0 && screen === "main") {
-      setScreen("wallet");
-    }
-    if (walletAddresses.length > 0 && !walletData) {
-      setLoadingTokens(true);
+    if (activeWallet && !walletData) {
       setTimeout(() => {
-        setWalletData({
-          balance: "123.45 TON",
-          tokens: [
-            {
-              id: 1,
-              name: "$MNTK",
-              balance: "1000",
-              usdValue: "$150.00",
-              rewards: "12.3 TON",
-              logo: "/mntk-logo.png",
-              buyUrl: "https://buy.manetka.io",
-              sellUrl: "https://sell.manetka.io"
-            },
-            {
-              id: 2,
-              name: "$REWARD",
-              balance: "500",
-              usdValue: "$50.00",
-              rewards: "5 TON",
-              logo: "/reward-logo.png",
-              buyUrl: "https://buy.reward.io",
-              sellUrl: "https://sell.reward.io"
-            }
-          ]
-        });
-        setLoadingTokens(false);
+        setWalletData({ balance: "123.45 TON", tokens: [] });
       }, 1000);
     }
-  }, [walletAddresses, screen, walletData]);
+  }, [activeWallet]);
 
-  // Функция подключения кошелька
-  const connectWallet = async () => {
+  // Fetch mock referrals
+  useEffect(() => {
+    if (userId && refsList.length === 0) {
+      // Example: fetch `/api/referral/stats?telegramId=${userId}`
+      setRefsList(["REF123", "REF456"]);
+    }
+  }, [userId]);
+
+  const connectWith = async (w: WalletInfo) => {
     setIsConnecting(true);
     try {
-      await connectorRef.current?.connect({
-        universalLink: "https://app.tonkeeper.com/ton-connect",
-        bridgeUrl: "https://bridge.tonapi.io/bridge"
-      });
-    } catch (err) {
-      console.error("Wallet connect failed", err);
+      let source: WalletConnectionSource;
+      if (w.jsBridgeKey) {
+        source = { jsBridgeKey: w.jsBridgeKey };
+      } else if (w.universalLink) {
+        source = { universalLink: w.universalLink, bridgeUrl: w.bridgeUrl! };
+      } else {
+        console.warn("Unsupported wallet type", w);
+        setIsConnecting(false);
+        return;
+      }
+      if (connector.connected) await connector.disconnect();
+      await connector.connect(source);
+    } catch (e) {
+      console.error(e);
     } finally {
       setIsConnecting(false);
     }
   };
 
-  // Форматирование адреса
   const formatTonAddress = (addr: string) =>
     addr.startsWith("EQ") || addr.startsWith("UQ")
       ? `${addr.slice(0, 5)}...${addr.slice(-4)}`
       : addr;
 
-  // Компоненты
-  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="max-w-[390px] w-full mx-auto min-h-screen bg-[#f9f9f9] flex flex-col">
       {children}
-      <div id="tonconnect-root" className="hidden" />
     </div>
   );
 
-  const NavButton = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
-    <button onClick={() => setScreen(value)} className={`flex flex-col items-center flex-1 ${screen === value ? "text-blue-600" : "text-gray-400"}`}>
+  const NavButton: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
+    <button
+      onClick={() => setScreen(value as any)}
+      className={`flex flex-col items-center flex-1 ${screen === value ? "text-blue-600" : "text-gray-400"}`}>
       <div className="w-6 h-6 mb-1">{icon}</div>
       <span className="text-[10px] font-medium leading-none">{label}</span>
     </button>
   );
 
-  // Рендер экранов
   const renderScreen = () => {
-    if (screen === "main") {
-      return (
-        <Wrapper>
-          <div className="p-6 bg-white min-h-screen flex flex-col items-center justify-center text-center gap-6">
-            <img src="/logo.png" alt="Logo" className="w-24 h-24" />
-            <div>
-              <h1 className="text-2xl font-aboreto text-gray-900 mb-2">MANETKA WALLET</h1>
-              <p className="text-sm text-gray-600 font-abeezee">All reward tokens in one place with MANETKA WALLET</p>
-            </div>
-            <button
-              disabled={isConnecting}
-              onClick={connectWallet}
-              className="bg-[#EBB923] hover:bg-yellow-400 disabled:opacity-50 text-gray-900 font-semibold text-sm px-6 py-2 rounded-full shadow"
-            >
-              {isConnecting ? "Connecting…" : "Connect your TON wallet"}
-            </button>
-          </div>
-        </Wrapper>
-      );
-    }
-
-    if (screen === "wallet") {
-      return (
-        <Wrapper>
-          <div className="p-6 bg-white min-h-screen">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-[18px] font-aboreto text-gray-900">TOKEN ASSETS</h2>
-              <div className="flex items-center gap-3">
-                {walletData ? (
-                  <span className="text-xs font-abeezee text-gray-500">Balance: {walletData.balance}</span>
-                ) : (
-                  <div className="w-20 h-4 bg-gray-100 rounded animate-pulse" />
-                )}
-                <img
-                  src={userPhoto}
-                  alt="User Avatar"
-                  className="w-8 h-8 rounded-full border border-gray-300 cursor-pointer"
-                  onClick={() => setScreen("account")}
-                />
-              </div>
-            </div>
-            {/* Tokens */}
-            {loadingTokens ? (
-              <div className="flex flex-col gap-4 animate-pulse">
-                {[1, 2].map(i => (
-                  <div key={i} className="bg-gray-100 rounded-2xl h-24" />
-                ))}
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {walletData.tokens.map((token: any) => (
-                  <div
-                    key={token.id}
-                    className="bg-white rounded-2xl p-4 shadow-md border border-gray-200 flex items-center justify-between hover:shadow-lg transition"
-                  >
-                    <div className="flex items-center gap-3">
-                      <img src={token.logo} alt={token.name} className="w-10 h-10 rounded-full" />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-gray-900 font-aboreto">{token.name}</span>
-                        <span className="text-xs text-gray-500 font-abeezee">Amount: {token.balance}</span>
-                        <span className="text-xs text-gray-400 font-abeezee">USD: {token.usdValue}</span>
-                        <span className="text-xs text-blue-500 font-abeezee">Rewards: {token.rewards}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={() => window.open(token.buyUrl, "_blank")}
-                        className="bg-[#EBB923] hover:bg-yellow-400 text-gray-900 font-semibold text-xs px-4 py-1 rounded-full"
-                      >
-                        Buy
-                      </button>
-                      <button
-                        onClick={() => window.open(token.sellUrl, "_blank")}
-                        className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold text-xs px-4 py-1 rounded-full"
-                      >
-                        Sell
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </Wrapper>
-      );
-    }
-
-    if (screen === "account") {
-      return (
-        <Wrapper>
-          <div className="p-6 bg-white min-h-screen">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <button onClick={() => setScreen("wallet")} className="text-gray-700">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <h2 className="text-base font-aboreto text-gray-900">ACCOUNT</h2>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-abeezee">EN</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" checked readOnly />
-                  <div className="w-9 h-5 bg-gray-200 rounded-full peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-                </label>
-                <span className="text-xs font-abeezee text-gray-400">RU</span>
-              </div>
-            </div>
-            {/* User info */}
-            <div className="flex items-center gap-4 mb-6">
-              <img src={userPhoto} alt="User Avatar" className="w-16 h-16 rounded-full border border-gray-300" />
+    switch (screen) {
+      case "main":
+        return (
+          <Wrapper>
+            <div className="p-6 bg-white min-h-screen flex flex-col items-center justify-center text-center gap-6">
+              <img src="/logo.png" alt="Logo" className="w-24 h-24" />
               <div>
-                <h2 className="text-xl font-bold text-gray-800">{userName}</h2>
-                <p className="text-sm text-gray-500 font-mono">ID: {userId}</p>
+                <h1 className="text-2xl font-aboreto text-gray-900 mb-2">MANETKA WALLET</h1>
+                <p className="text-sm text-gray-600 font-abeezee">
+                  All reward tokens in one place with MANETKA WALLET
+                </p>
               </div>
-            </div>
-            {/* Connected wallets */}
-            <div className="mt-6">
-              <div className="text-sm font-semibold text-gray-600 mb-2">Connected TON wallets:</div>
-              {walletAddresses.length === 0 && <p className="text-gray-500">No wallets connected.</p>}
-              {walletAddresses.map(addr => (
-                <div key={addr} className="mt-2 flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition">
-                  <span className="text-sm font-mono text-gray-800 break-all">{formatTonAddress(addr)}</span>
-                  <button
-                    onClick={async () => {
-                      if (!confirm("Disconnect this wallet?")) return;
-                      await connectorRef.current?.disconnect();
-                      setWalletAddresses(prev => prev.filter(a => a !== addr));
-                      if (activeWallet === addr) {
-                        setActiveWallet(walletAddresses.find(a => a !== addr) || null);
-                      }
-                    }}
-                    className="text-white text-xs bg-black px-4 py-1.5 rounded-full hover:bg-gray-800"
-                  >
-                    Disconnect
-                  </button>
-                </div>
-              ))}
               <button
                 disabled={isConnecting}
-                onClick={connectWallet}
-                className="mt-6 w-full bg-[#EBB923] hover:bg-yellow-400 disabled:opacity-50 text-gray-900 text-sm font-medium px-4 py-2 rounded-full shadow transition"
-              >
-                {isConnecting ? "Connecting…" : "Connect one more TON wallet"}
+                onClick={() => setScreen("selectWallet")}
+                className="bg-[#EBB923] hover:bg-yellow-400 disabled:opacity-50 text-gray-900 font-semibold text-sm px-6 py-2 rounded-full shadow">
+                {isConnecting ? "Connecting…" : "Connect your TON wallet"}
               </button>
             </div>
-          </div>
-        </Wrapper>
-      );
-    }
-
-    if (screen === "refs") {
-      return (
-        <Wrapper>
-          <div className="p-6 bg-white min-h-screen space-y-4">
-            <h2 className="text-xl font-bold text-gray-800">Your Referrals</h2>
-            <p className="text-sm text-gray-600">Share your referral link:</p>
-            <input
-              readOnly
-              value={`https://t.me/yourbot?start=${userId}`}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            />
-            <ul className="space-y-2">
-              {refs.map(ref => (
-                <li key={ref.id} className="bg-gray-100 p-2 rounded-md text-sm">{ref.username}</li>
-              ))}
-            </ul>
-          </div>
-        </Wrapper>
-      );
-    }
-
-    if (screen === "social") {
-      return (
-        <Wrapper>
-          <div className="p-6 bg-white min-h-screen space-y-4">
-            <h2 className="text-xl font-bold text-gray-800">Follow us</h2>
-            <div className="space-y-3">
-              <a href="https://t.me/manetka" target="_blank" className="block text-blue-600 underline">Telegram</a>
-              <a href="https://twitter.com/manetka" target="_blank" className="block text-blue-600 underline">Twitter</a>
+          </Wrapper>
+        );
+      case "selectWallet":
+        return (
+          <Wrapper>
+            <div className="p-6 bg-white min-h-screen">
+              <h2 className="text-xl font-aboreto text-gray-900 mb-4">Select TON Wallet</h2>
+              <ul className="space-y-2">
+                {walletList.map((w) => (
+                  <li key={w.name}>
+                    <button
+                      onClick={() => connectWith(w)}
+                      className="flex items-center px-4 py-2 border rounded-2xl shadow hover:bg-gray-100 w-full">
+                      <img src={w.imageUrl} alt={w.name} className="w-6 h-6 mr-2" />
+                      {w.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-        </Wrapper>
-      );
+          </Wrapper>
+        );
+      case "wallet":
+        return (
+          <Wrapper>
+            <div className="p-6 bg-white min-h-screen">
+              <h2 className="text-xl font-aboreto text-gray-900 mb-4">Wallet</h2>
+              <p>Address: {activeWallet ? formatTonAddress(activeWallet) : "-"}</p>
+              <p>Balance: {walletData?.balance ?? "-"}</p>
+            </div>
+          </Wrapper>
+        );
+      case "account":
+        return (
+          <Wrapper>
+            <div className="p-6 bg-white min-h-screen">
+              <h2 className="text-xl font-aboreto text-gray-900 mb-4">Account</h2>
+              <img src={userPhoto} alt="Photo" className="w-16 h-16 rounded-full mb-2" />
+              <p>Name: {userName ?? "-"}</p>
+              <p>ID: {userId ?? "-"}</p>
+            </div>
+          </Wrapper>
+        );
+      case "refs":
+        return (
+          <Wrapper>
+            <div className="p-6 bg-white min-h-screen">
+              <h2 className="text-xl font-aboreto text-gray-900 mb-4">Referrals</h2>
+              <ul className="list-disc list-inside">
+                {refsList.map((ref, i) => (
+                  <li key={i}>{ref}</li>
+                ))}
+              </ul>
+            </div>
+          </Wrapper>
+        );
+      case "social":
+        return (
+          <Wrapper>
+            <div className="p-6 bg-white min-h-screen">
+              <h2 className="text-xl font-aboreto text-gray-900 mb-4">Social Feed</h2>
+              <p>Here will be posts from community.</p>
+            </div>
+          </Wrapper>
+        );
+      case "lottery":
+        return (
+          <Wrapper>
+            <div className="p-6 bg-white min-h-screen">
+              <h2 className="text-xl font-aboreto text-gray-900 mb-4">Lottery</h2>
+              <p>Lottery tickets and results go here.</p>
+            </div>
+          </Wrapper>
+        );
+      case "nfts":
+        return (
+          <Wrapper>
+            <div className="p-6 bg-white min-h-screen">
+              <h2 className="text-xl font-aboreto text-gray-900 mb-4">NFTs</h2>
+              <p>Your NFT collection will be displayed here.</p>
+            </div>
+          </Wrapper>
+        );
+      default:
+        return (
+          <Wrapper>
+            <p className="p-4 text-center">Page not found</p>
+          </Wrapper>
+        );
     }
-
-    if (screen === "lottery") {
-      return (
-        <Wrapper>
-          <div className="p-6 bg-white min-h-screen text-center">
-            <h2 className="text-xl font-bold text-gray-800 mb-2">Lottery</h2>
-            <p className="text-gray-600">Coming soon...</p>
-          </div>
-        </Wrapper>
-      );
-    }
-
-    if (screen === "nfts") {
-      return (
-        <Wrapper>
-          <div className="p-6 bg-white min-h-screen text-center">
-            <h2 className="text-xl font-bold text-gray-800 mb-2">NFTs</h2>
-            <p className="text-gray-600">Coming soon...</p>
-          </div>
-        </Wrapper>
-      );
-    }
-
-return <Wrapper><p className="p-4">Page not found</p></Wrapper>;
   };
 
   return (
@@ -355,7 +239,7 @@ return <Wrapper><p className="p-4">Page not found</p></Wrapper>;
       <div className="w-full max-w-[390px] flex flex-col pb-16">
         {renderScreen()}
         {screen !== "main" && (
-          <div className="w-full border-t bg-white shadow-inner flex justify-around py-3 text-sm fixed bottom-0 max-w-[390px] mx-auto">
+          <div className="w-full border-t bg-white shadow-inner flex justify-around py-3 fixed bottom-0 max-w-[390px] mx-auto">
             <NavButton icon={<WalletIcon size={20} />} label="Wallet" value="wallet" />
             <NavButton icon={<Ticket size={20} />} label="Lottery" value="lottery" />
             <NavButton icon={<NftIcon size={20} />} label="NFTs" value="nfts" />
