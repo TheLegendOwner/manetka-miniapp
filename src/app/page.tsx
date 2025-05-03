@@ -9,9 +9,10 @@ import {
   Users,
   Link2
 } from 'lucide-react';
-import { useTon } from '@/lib/ton';
+import { useTon } from '@/lib/ton'; // useTon hook handles TonConnect logic client-side
 
 export default function Page() {
+  // useTon hook provides wallets array, current walletInfo, and connect/disconnect methods
   const { wallets, walletInfo, connect, disconnect } = useTon();
   const [screen, setScreen] = useState<
     'main' | 'selectWallet' | 'wallet' | 'account' | 'refs' | 'social' | 'lottery' | 'nfts'
