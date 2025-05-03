@@ -1,12 +1,16 @@
-import '../styles/globals.css';
-import '../lib/i18n';
-import type { AppProps } from 'next/app';
+'use client';
+
+import { AppProps } from 'next/app';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
+import { TelegramProvider } from '../context/TelegramContext';
+import '../styles/globals.css';
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <TonConnectUIProvider manifestUrl="https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json">
-      <Component {...pageProps} />
+    <TonConnectUIProvider manifestUrl="https://your-domain.com/tonconnect-manifest.json">
+      <TelegramProvider>
+        <Component {...pageProps} />
+      </TelegramProvider>
     </TonConnectUIProvider>
   );
 }
