@@ -1,6 +1,11 @@
 {
+  "url": "https://manetka-miniapp-rufp.vercel.app",               
   "name": "Manetka MiniApp",
-  "description": "Telegram Mini App for managing tasks",
-  "iconUrl": "https://manetka-miniapp-rufp.vercel.app/logo.png",
-  "permissions": ["tonClient.wallet_events"]
+  "iconUrl": "https://manetka-miniapp-rufp.vercel.app/logo.png",  
+  "termsOfUseUrl": "https://manetka-miniapp-rufp.vercel.app/terms",
+  "privacyPolicyUrl": "https://manetka-miniapp-rufp.vercel.app/privacy",
+  "manifestVersion": "0.0.1",
+  "bridgeUrl": "https://bridge.tonapi.io/bridge",
+  "platforms": ["telegram-mini-app"],
+  "appVersion": "1.0.0"
 }
