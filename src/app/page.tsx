@@ -9,7 +9,7 @@ import {
   Users,
   Link2
 } from "lucide-react";
-import { TonConnect } from "@tonconnect/sdk";
+import { TonConnect, isWalletInfoCurrentlyInjected, isWalletInfoRemote } from "@tonconnect/sdk";
 import type { WalletInfo, WalletConnectionSource } from "@tonconnect/sdk";
 
 // Initialize TonConnect once at module level to avoid recreations
@@ -43,7 +43,7 @@ export default function Page() {
     setUserName(tgUser?.first_name ?? null);
     setUserPhoto(tgUser?.photo_url ?? "/default-avatar.png");
 
-    // Validate initData on server – send raw initData for authentic signature verification
+    // Validate initData on server
     fetch("/api/validate-initdata", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -84,10 +84,10 @@ export default function Page() {
     setIsConnecting(true);
     try {
       let source: WalletConnectionSource;
-      if (w.jsBridgeKey) {
+      if (isWalletInfoCurrentlyInjected(w)) {
         source = { jsBridgeKey: w.jsBridgeKey };
-      } else if (w.universalLink) {
-        source = { universalLink: w.universalLink, bridgeUrl: w.bridgeUrl! };
+      } else if (isWalletInfoRemote(w)) {
+        source = { universalLink: w.universalLink!, bridgeUrl: w.bridgeUrl! };
       } else {
         console.warn("Unsupported wallet type", w);
         setIsConnecting(false);
