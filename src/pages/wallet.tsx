@@ -1,47 +1,93 @@
+// src/pages/wallet.tsx
 'use client';
+
 import React from 'react';
-import { useTonConnectUI, TonConnectButton } from '@tonconnect/ui-react';
-import Link from 'next/link';
+import Image from 'next/image';
+import { useTonConnectUI } from '@tonconnect/ui-react';
+import { useRouter } from 'next/router';
+import { useEffect } from 'react';
+
+// Моки токенов
+const tokens = [
+  {
+    name: 'MANETKA',
+    logo: '/token-manetka.png',
+    balance: '1,250',
+    usd: '$220.00',
+    rewards: '3.2 TON',
+  },
+  {
+    name: 'TONCOIN',
+    logo: '/token-ton.png',
+    balance: '500',
+    usd: '$1,050.00',
+    rewards: '1.8 TON',
+  }
+];
 
 export default function WalletPage() {
   const [tonConnectUI] = useTonConnectUI();
+  const isConnected = tonConnectUI?.connected;
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isConnected) {
+      router.push('/');
+    }
+  }, [isConnected]);
+
+  // Мок Telegram User
+  const tgUser = {
+    username: 'ton_user',
+    avatar: '/tg-avatar.png'
+  };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-white p-6">
-      <img src="/logo.png" alt="Manetka Logo" className="w-28 h-28 mb-6" />
-      <h1 className="text-3xl font-bold text-gray-900 mb-4">MANETKA WALLET</h1>
-      <p className="text-gray-600 text-center mb-8">
-        Manage your connected TON wallet here.
-      </p>
+    <div className="flex flex-col min-h-screen bg-white">
+      {/* Header */}
+      <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200">
+        <h1 className="text-xl font-semibold text-gray-900">TOKEN ASSETS</h1>
+        <div className="w-10 h-10 rounded-full overflow-hidden">
+          <Image src={tgUser.avatar} alt="avatar" width={40} height={40} />
+        </div>
+      </div>
 
-      {/* Стандартная кнопка */}
-      <TonConnectButton className="w-full max-w-sm bg-[#EBB923] hover:bg-yellow-400 text-gray-900 font-semibold py-3 rounded-full shadow" />
+      {/* Token list */}
+      <div className="flex-1 p-4 space-y-4">
+        {tokens.map((token, idx) => (
+          <div
+            key={idx}
+            className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm"
+          >
+            <Image
+              src={token.logo}
+              alt={token.name}
+              width={48}
+              height={48}
+              className="mr-4"
+            />
+            <div className="flex flex-col">
+              <span className="text-lg font-semibold text-gray-800">{token.name}</span>
+              <span className="text-sm text-gray-600">Balance: {token.balance}</span>
+              <span className="text-sm text-gray-600">In USD: {token.usd}</span>
+              <span className="text-sm text-green-600 font-medium">Rewards: {token.rewards}</span>
+            </div>
+          </div>
+        ))}
+      </div>
 
-      {/* Кастомный вызов модалки */}
-      <button
-        onClick={() => tonConnectUI.openModal()}
-        className="w-full max-w-sm mt-4 bg-[#EBB923] hover:bg-[#d1a619] text-gray-900 font-semibold py-3 rounded-full shadow"
-      >
-        Open TON Connect
-      </button>
-
-      {/* Навигация по разделам */}
-      <div className="mt-6 space-y-2 w-full max-w-sm">
-        <Link href="/refs" className="block bg-green-500 text-white px-4 py-2 rounded">
-          Referrals
-        </Link>
-        <Link href="/account" className="block bg-blue-500 text-white px-4 py-2 rounded">
-          Account
-        </Link>
-        <Link href="/social" className="block bg-indigo-500 text-white px-4 py-2 rounded">
-          Social
-        </Link>
-        <Link href="/lottery" className="block bg-purple-500 text-white px-4 py-2 rounded">
-          Lottery
-        </Link>
-        <Link href="/nfts" className="block bg-pink-500 text-white px-4 py-2 rounded">
-          NFTs
-        </Link>
+      {/* Footer navigation */}
+      <div className="border-t border-gray-200 p-2 bg-white flex justify-around">
+        {/* Можно подключить react-icons или lucide-react */}
+        <button className="flex flex-col items-center text-gray-700">
+          <span className="text-sm">Wallet</span>
+        </button>
+        <button className="flex flex-col items-center text-gray-500">
+          <span className="text-sm">Account</span>
+        </button>
+        <button className="flex flex-col items-center text-gray-500">
+          <span className="text-sm">Refs</span>
+        </button>
       </div>
     </div>
   );
