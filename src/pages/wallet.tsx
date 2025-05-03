@@ -44,8 +44,12 @@ export default function WalletPage() {
   }, [tonConnectUI]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user?.photo_url) {
-      setAvatar(window.Telegram.WebApp.initDataUnsafe.user.photo_url);
+    if (typeof window !== 'undefined') {
+      const photo = window.Telegram?.WebApp?.initDataUnsafe?.user?.photo_url;
+      console.log('TG photo_url:', photo);
+      if (photo) {
+        setAvatar(photo);
+      }
     }
   }, []);
 
@@ -55,13 +59,12 @@ export default function WalletPage() {
     <div className="flex flex-col min-h-screen bg-[#F9FAFB] font-['Aboreto']">
       <div className="flex justify-between items-center px-5 py-4 border-b border-gray-200 bg-white">
         <h1 className="text-[20px] font-semibold text-[#171A1F]">TOKEN ASSETS</h1>
-<div
-  className="w-9 h-9 rounded-full overflow-hidden border border-gray-300 cursor-pointer"
-  onClick={() => router.push('/account')}
->
-  <Image src={avatar} alt="avatar" width={36} height={36} />
-</div>
-
+        <div
+          className="w-9 h-9 rounded-full overflow-hidden border border-gray-300 cursor-pointer"
+          onClick={() => router.push('/account')}
+        >
+          <Image src={avatar} alt="avatar" width={36} height={36} />
+        </div>
       </div>
 
       <div className="flex-1 px-4 pt-4 pb-24 space-y-4">
@@ -71,11 +74,11 @@ export default function WalletPage() {
             className="flex justify-between items-center bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm"
           >
             <div className="flex flex-col w-full mr-4">
-              <span className="text-[20px] font-bold text-gray-900 leading-tight">{token.name}</span>
+              <span className="text-[20px] font-bold text-[#171A1F] leading-tight">{token.name}</span>
               <span className="text-[12px] text-[#9095A1]">BALANCE: {token.balance}</span>
               <span className="text-[12px] text-[#9095A1]">BALANCE IN USD: {token.usd}</span>
               <span className="text-[12px] text-[#9095A1]">BALANCE IN TON: {token.ton}</span>
-              <span className="text-[13px]  text-green-600 font-bold">REWARDS: {token.rewards}</span>
+              <span className="text-[13px] text-green-600 font-bold">REWARDS: {token.rewards}</span>
               <button
                 className="mt-2 w-full border border-[#8B6C0D] text-[#8B6C0D] text-sm py-1 rounded-full bg-white"
               >
