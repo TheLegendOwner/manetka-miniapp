@@ -6,14 +6,15 @@ import { useRouter } from 'next/router';
 
 export default function MainPage() {
   const [tonConnectUI] = useTonConnectUI();
-  const isConnected = tonConnectUI?.connected ?? false;
   const router = useRouter();
 
+  const address = tonConnectUI?.account?.address;
+
   useEffect(() => {
-    if (isConnected) {
+    if (address) {
       router.push('/wallet');
     }
-  }, [isConnected]);
+  }, [address]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
@@ -27,14 +28,16 @@ export default function MainPage() {
         </p>
       </div>
 
-      <div className="absolute bottom-[50px] w-full flex justify-center">
-        <button
-          onClick={() => tonConnectUI?.openModal()}
-          className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md"
-        >
-          Connect your TON Wallet
-        </button>
-      </div>
+      {!address && (
+        <div className="absolute bottom-[50px] w-full flex justify-center">
+          <button
+            onClick={() => tonConnectUI?.openModal()}
+            className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md"
+          >
+            Connect your TON Wallet
+          </button>
+        </div>
+      )}
     </div>
   );
 }

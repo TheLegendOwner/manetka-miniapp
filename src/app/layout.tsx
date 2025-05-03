@@ -1,4 +1,4 @@
-import "@/app/globals.css";
+import "../app/globals.css";
 import { Aboreto, ABeeZee } from "next/font/google";
 import type { Metadata } from "next";
 
