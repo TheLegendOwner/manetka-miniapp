@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTonConnectUI } from '@tonconnect/ui-react';
 import { useRouter } from 'next/router';
 
@@ -8,13 +8,36 @@ export default function MainPage() {
   const [tonConnectUI] = useTonConnectUI();
   const router = useRouter();
 
+  const [delayedCheck, setDelayedCheck] = useState(false);
+  const [connected, setConnected] = useState(false);
+
   const address = tonConnectUI?.account?.address;
 
+  // Подписка на изменения подключения кошелька
   useEffect(() => {
-    if (typeof window !== 'undefined' && address) {
+    const unsubscribe = tonConnectUI.onStatusChange(wallet => {
+      if (wallet?.account?.address) {
+        setConnected(true);
+      }
+    });
+    return () => unsubscribe();
+  }, [tonConnectUI]);
+
+  // Первая попытка редиректа
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (address || connected)) {
+      router.replace('/wallet');
+    } else {
+      setTimeout(() => setDelayedCheck(true), 500);
+    }
+  }, [address, connected]);
+
+  // Вторая попытка после инициализации
+  useEffect(() => {
+    if (delayedCheck && (address || connected)) {
       router.replace('/wallet');
     }
-  }, [address]);
+  }, [delayedCheck, address, connected]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
@@ -29,7 +52,7 @@ export default function MainPage() {
       </div>
 
       {!address && (
-        <div className="absolute bottom-[50px] w-full flex justify-center">
+        <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
           <button
             onClick={() => tonConnectUI?.openModal()}
             className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md"
