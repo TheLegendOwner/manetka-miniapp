@@ -109,7 +109,7 @@ export default function Page() {
             <div className="p-6 bg-white min-h-screen">
               <h2 className="text-xl font-aboreto text-gray-900 mb-4">Wallet</h2>
               <p>Address: {walletInfo ? formatTonAddress(walletInfo.account.address) : '-'}</p>
-              <p>Balance: {walletInfo ? (walletInfo.account.balance ?? 'Loading...') : '-'}</p>
+              <p>Balance: -</p>
               <button
                 onClick={disconnect}
                 className="mt-4 px-4 py-2 bg-red-500 text-white rounded-full"
