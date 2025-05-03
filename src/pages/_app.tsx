@@ -1,10 +1,10 @@
-import '../styles/globals.css';
-import type { AppProps } from 'next/app';
+// src/pages/_app.tsx
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
+import '@/styles/globals.css';
 
-export default function App({ Component, pageProps }: AppProps) {
+export default function App({ Component, pageProps }: any) {
   return (
-    <TonConnectUIProvider manifestUrl="/tonconnect-manifest.json">
+    <TonConnectUIProvider manifestUrl="https://manetka-miniapp-rufp.vercel.app/tonconnect-manifest.json">
       <Component {...pageProps} />
     </TonConnectUIProvider>
   );

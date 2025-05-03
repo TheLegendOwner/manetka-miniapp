@@ -6,6 +6,7 @@ import { useTonConnectUI } from '@tonconnect/ui-react';
 export default function MainPage() {
   const [tonConnectUI] = useTonConnectUI();
   const isConnected = tonConnectUI?.connected ?? false;
+  const account = tonConnectUI?.account;
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
