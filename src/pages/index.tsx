@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useTonConnectUI } from '@tonconnect/ui-react';
 import { useRouter } from 'next/router';
 
@@ -11,8 +11,8 @@ export default function MainPage() {
   const address = tonConnectUI?.account?.address;
 
   useEffect(() => {
-    if (address) {
-      router.push('/wallet');
+    if (typeof window !== 'undefined' && address) {
+      router.replace('/wallet');
     }
   }, [address]);
 
