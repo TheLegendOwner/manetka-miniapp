@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 html,
-body {
+body, #__next  {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -13,6 +13,8 @@ body {
   font-family: 'Inter', sans-serif;
   background-color: #f9f9f9;
   color: #333;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 
 /* Layout helpers */
