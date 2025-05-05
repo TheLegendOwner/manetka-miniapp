@@ -25,7 +25,8 @@ export default function App({ Component, pageProps }: AppProps) {
   }, []);
 
   // Формируем URL к манифесту из переменных окружения
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+  // Используем относительный путь к манифесту из public/
+  const manifestUrl = '/tonconnect-manifest.json';
   const manifestUrl = baseUrl ? `${baseUrl}/tonconnect-manifest.json` : undefined;
 
   return (
