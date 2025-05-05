@@ -24,10 +24,8 @@ export default function App({ Component, pageProps }: AppProps) {
     };
   }, []);
 
-  // Формируем URL к манифесту из переменных окружения
   // Используем относительный путь к манифесту из public/
   const manifestUrl = '/tonconnect-manifest.json';
-  const manifestUrl = baseUrl ? `${baseUrl}/tonconnect-manifest.json` : undefined;
 
   return (
     <TonConnectUIProvider manifestUrl={manifestUrl}>
