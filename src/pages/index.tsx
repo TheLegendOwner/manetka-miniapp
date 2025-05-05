@@ -1,36 +1,25 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
-import { useTonConnectUI } from '@tonconnect/ui-react';
+import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
 import { useRouter } from 'next/router';
 
-export default function MainPage() {
+function MainPage() {
   const [tonConnectUI] = useTonConnectUI();
+  const address = useTonAddress();
   const router = useRouter();
   const [delayedCheck, setDelayedCheck] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const address = tonConnectUI?.account?.address;
 
+  // Redirect on connection
   useEffect(() => {
-    const unsubscribe = tonConnectUI.onStatusChange(wallet => {
-      if (wallet?.account?.address) setConnected(true);
-    });
-    return () => unsubscribe();
-  }, [tonConnectUI]);
-
-  useEffect(() => {
-    if ((address || connected) && typeof window !== 'undefined') {
+    if (address) {
       router.replace('/wallet');
     } else {
-      setTimeout(() => setDelayedCheck(true), 500);
+      const timer = setTimeout(() => setDelayedCheck(true), 500);
+      return () => clearTimeout(timer);
     }
-  }, [address, connected]);
-
-  useEffect(() => {
-    if (delayedCheck && (address || connected)) {
-      router.replace('/wallet');
-    }
-  }, [delayedCheck, address, connected]);
+  }, [address, router]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
@@ -42,11 +31,18 @@ export default function MainPage() {
         </p>
       </div>
 
-      {!address && (
+      {!address && delayedCheck && (
         <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
-          <button onClick={() => tonConnectUI.openModal()} className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md">Connect your TON Wallet</button>
+          <button
+            onClick={() => tonConnectUI.openModal()}
+            className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md"
+          >
+            Connect your TON Wallet
+          </button>
         </div>
       )}
     </div>
   );
 }
+
+export default dynamic(() => Promise.resolve(MainPage), { ssr: false });
