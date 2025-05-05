@@ -25,7 +25,10 @@ export default function App({ Component, pageProps }: AppProps) {
   }, []);
 
   // Используем относительный путь к манифесту из public/
-  const manifestUrl = '/tonconnect-manifest.json';
+  // Используем абсолютный путь к манифесту на клиенте
+  const manifestUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/tonconnect-manifest.json`
+    : undefined;
 
   return (
     <TonConnectUIProvider manifestUrl={manifestUrl}>
