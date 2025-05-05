@@ -24,8 +24,11 @@ export default function App({ Component, pageProps }: AppProps) {
   }, []);
 
   // Используем URL из переменных окружения
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
-  const manifestUrl = `${baseUrl.replace(/\/$/, '')}/tonconnect-manifest.json`;
+const baseUrlRaw = process.env.NEXT_PUBLIC_APP_URL;
+const manifestUrl = baseUrlRaw
+  ? `${baseUrlRaw.replace(/\/$/, '')}/tonconnect-manifest.json`
+  : '';
+
 
   return (
     <TonConnectUIProvider
