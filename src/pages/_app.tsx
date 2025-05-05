@@ -1,4 +1,3 @@
-// src/pages/_app.tsx
 'use client';
 
 import { useEffect } from 'react';
@@ -14,10 +13,7 @@ export default function App({ Component, pageProps }: AppProps) {
     document.addEventListener('gesturestart', onGestureStart);
 
     const onTouchMove = (e: TouchEvent) => {
-      // блокируем мультитач (pinch-зум)
-      if (e.touches.length > 1) {
-        e.preventDefault();
-      }
+      if (e.touches.length > 1) e.preventDefault();
     };
     document.addEventListener('touchmove', onTouchMove, { passive: false });
 
@@ -27,18 +23,13 @@ export default function App({ Component, pageProps }: AppProps) {
     };
   }, []);
 
-  // Берём базовый URL из .env и приводим к шаблонному типу для раздачи манифеста и TWA-привязки
+  // Используем URL из переменных окружения
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL!;
-  const manifestUrl = `${baseUrl}/tonconnect-manifest.json`;
-  const twaReturnUrl = (baseUrl as `${string}://${string}`);
+  const manifestUrl = `${baseUrl.replace(/\/$/, '')}/tonconnect-manifest.json`;
 
   return (
     <TonConnectUIProvider
       manifestUrl={manifestUrl}
-      actionsConfiguration={{
-        // чтобы при открытии из TWA можно было «вернуться» в мессенджер
-        twaReturnUrl
-      }}
     >
       <TelegramProvider>
         <Component {...pageProps} />
