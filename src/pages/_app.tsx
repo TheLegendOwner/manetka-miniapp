@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { AppProps } from 'next/app';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { TelegramProvider } from '../context/TelegramContext';
+import { SocketProvider } from '../context/WebSocketContext';
 import '../styles/globals.css';
 
 export default function App({ Component, pageProps }: AppProps) {
