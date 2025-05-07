@@ -1,3 +1,4 @@
+// src/context/WebSocketContext.tsx
 'use client';
 
 import React, { createContext, useContext, useEffect, useRef, ReactNode } from 'react';
@@ -19,7 +20,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     if (!ready) return;
 
     // Подключаемся к WS после готовности Telegram
-    const socket = io(WS_URL, { transports: ['websocket'] });(WS_URL, { transports: ['websocket'] });
+    const socket = io(WS_URL, { transports: ['websocket'] });
     socketRef.current = socket;
 
     // При первичном подключении отправляем авторизацию
