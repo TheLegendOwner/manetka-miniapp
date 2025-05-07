@@ -1,3 +1,4 @@
+// src/pages/_app.tsx
 'use client';
 
 import { useEffect } from 'react';
@@ -25,7 +26,6 @@ export default function App({ Component, pageProps }: AppProps) {
     };
   }, []);
 
-  // Используем относительный путь к манифесту из public/
   // Используем абсолютный путь к манифесту на клиенте
   const manifestUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/tonconnect-manifest.json`
@@ -34,7 +34,10 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <TonConnectUIProvider manifestUrl={manifestUrl}>
       <TelegramProvider>
-        <Component {...pageProps} />
+        {/* Оборачиваем всё приложение в SocketProvider */}
+        <SocketProvider>
+          <Component {...pageProps} />
+        </SocketProvider>
       </TelegramProvider>
     </TonConnectUIProvider>
   );
