@@ -1,14 +1,13 @@
-// src/context/WebSocketContext.tsx
 'use client';
 
 import React, { createContext, useContext, useEffect, useRef, ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useTelegram } from './TelegramContext';
 
-// Укажите ваш WS-сервер в .env (NEXT_PUBLIC_WS_URL)
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL!;
+// Убедитесь, что NEXT_PUBLIC_WS_URL указывает на действующий WebSocket-сервер
+// Vercel-фронтенд не может хостить Socket.IO, развёрните отдельный backend с Socket.IO
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL as string;
 
-// Контекст для Socket.IO
 const SocketContext = createContext<Socket | null>(null);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
@@ -19,43 +18,40 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     console.log('WebSocketContext: ready=', ready, 'WS_URL=', WS_URL);
     if (!ready) return;
 
-    // Подключаемся к WS после готовности Telegram
+    // Подключаемся к внешнему Socket.IO-серверу
     const socket = io(WS_URL, { transports: ['websocket'] });
     socketRef.current = socket;
 
-    // Логируем попытку соединения
     socket.io.on('reconnect_attempt', () => {
-      console.log('WebSocket attempting to reconnect');
+      console.log('WebSocket attempting to reconnect...');
     });
 
-    // При первичном подключении отправляем авторизацию
     socket.on('connect', () => {
       console.log('WebSocket connected, id=', socket.id);
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
-      console.log('WebApp initData=', initData);
+      console.log('Telegram initData=', initData);
       if (initData) {
         socket.emit('auth', { type: 'auth', initData });
-        console.log('Auth event emitted');
+        console.log('Sent auth event');
       }
     });
 
-    // При восстановлении соединения (reconnect) повторяем авторизацию
-    socket.on('reconnect', (attempt) => {
+    socket.on('reconnect', attempt => {
       console.log('WebSocket reconnected, attempt=', attempt);
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
-      console.log('WebApp initData after reconnect=', initData);
+      console.log('Telegram initData after reconnect=', initData);
       if (initData) {
         socket.emit('auth', { type: 'auth', initData });
-        console.log('Auth event emitted after reconnect');
+        console.log('Sent auth event after reconnect');
       }
     });
 
-    // Логируем отключения и ошибки подключения
     socket.on('disconnect', reason => {
       console.log('WebSocket disconnected:', reason);
     });
+
     socket.on('connect_error', err => {
       console.error('WebSocket connect_error:', err);
     });
@@ -73,7 +69,6 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Хук для получения Socket.IO из контекста
 export function useSocket(): Socket {
   const socket = useContext(SocketContext);
   if (!socket) {
