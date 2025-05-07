@@ -15,7 +15,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    if (!ready) return; // ждём инициализации Telegram WebApp
+    // Ждём инициализации Telegram WebApp, но соединение создаём сразу
+    // if (!ready) return; // ждём инициализации Telegram WebApp
 
     // Подключаемся к WS
     const socket = io(WS_URL, { transports: ['websocket'] });
