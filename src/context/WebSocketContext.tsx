@@ -16,20 +16,27 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // Ждём инициализации Telegram WebApp, только после этого подключаемся
+    console.log('WebSocketContext: ready=', ready, 'WS_URL=', WS_URL);
     if (!ready) return;
 
     // Подключаемся к WS после готовности Telegram
     const socket = io(WS_URL, { transports: ['websocket'] });
     socketRef.current = socket;
 
+    // Логируем попытку соединения
+    socket.io.on('reconnect_attempt', () => {
+      console.log('WebSocket attempting to reconnect');
+    });
+
     // При первичном подключении отправляем авторизацию
     socket.on('connect', () => {
       console.log('WebSocket connected, id=', socket.id);
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
+      console.log('WebApp initData=', initData);
       if (initData) {
         socket.emit('auth', { type: 'auth', initData });
+        console.log('Auth event emitted');
       }
     });
 
@@ -38,17 +45,19 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       console.log('WebSocket reconnected, attempt=', attempt);
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
+      console.log('WebApp initData after reconnect=', initData);
       if (initData) {
         socket.emit('auth', { type: 'auth', initData });
+        console.log('Auth event emitted after reconnect');
       }
     });
 
-    // Логируем отключения и прочие события
+    // Логируем отключения и ошибки подключения
     socket.on('disconnect', reason => {
       console.log('WebSocket disconnected:', reason);
     });
-    socket.on('update', data => {
-      console.log('Update from server:', data);
+    socket.on('connect_error', err => {
+      console.error('WebSocket connect_error:', err);
     });
 
     return () => {
