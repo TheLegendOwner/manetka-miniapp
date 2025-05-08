@@ -1,78 +1,65 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useRef, ReactNode } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Client, Message } from '@stomp/stompjs';
 import { useTelegram } from './TelegramContext';
 
-// Убедитесь, что NEXT_PUBLIC_WS_URL указывает на действующий WebSocket-сервер
-// Vercel-фронтенд не может хостить Socket.IO, развёрните отдельный backend с Socket.IO
+// URL Spring WebSocket endpoint (STOMP) e.g. wss://your-domain/ws
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL as string;
 
-const SocketContext = createContext<Socket | null>(null);
+// Контекст для STOMP-клиента
+const SocketContext = createContext<Client | null>(null);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   const { ready } = useTelegram();
-  const socketRef = useRef<Socket | null>(null);
+  const clientRef = useRef<Client | null>(null);
 
   useEffect(() => {
-    console.log('WebSocketContext: ready=', ready, 'WS_URL=', WS_URL);
-    if (!ready) return;
+    console.log('STOMP WebSocketContext: initializing, WS_URL=', WS_URL);
 
-    // Подключаемся к внешнему Socket.IO-серверу
-    const socket = io(WS_URL, { transports: ['websocket'] });
-    socketRef.current = socket;
-
-    socket.io.on('reconnect_attempt', () => {
-      console.log('WebSocket attempting to reconnect...');
+    const client = new Client({
+      brokerURL: WS_URL,
+      connectHeaders: {},
+      debug: str => console.log('STOMP:', str),
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
     });
 
-    socket.on('connect', () => {
-      console.log('WebSocket connected, id=', socket.id);
+    client.onConnect = frame => {
+      console.log('STOMP connected:', frame);
+      // Авто-авторизация после коннекта
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
-      console.log('Telegram initData=', initData);
       if (initData) {
-        socket.emit('auth', { type: 'auth', initData });
-        console.log('Sent auth event');
+        client.publish({
+          destination: '/app/auth',
+          body: JSON.stringify({ type: 'auth', initData }),
+        });
+        console.log('Sent auth via STOMP');
       }
-    });
+    };
 
-    socket.on('reconnect', attempt => {
-      console.log('WebSocket reconnected, attempt=', attempt);
-      const tg = (window as any).Telegram?.WebApp;
-      const initData = tg?.initData;
-      console.log('Telegram initData after reconnect=', initData);
-      if (initData) {
-        socket.emit('auth', { type: 'auth', initData });
-        console.log('Sent auth event after reconnect');
-      }
-    });
+    client.onStompError = frame => {
+      console.error('STOMP error:', frame.headers['message'], frame.body);
+    };
 
-    socket.on('disconnect', reason => {
-      console.log('WebSocket disconnected:', reason);
-    });
-
-    socket.on('connect_error', err => {
-      console.error('WebSocket connect_error:', err);
-    });
+    client.activate();
+    clientRef.current = client;
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      client.deactivate();
+      clientRef.current = null;
     };
   }, [ready]);
 
-  return (
-    <SocketContext.Provider value={socketRef.current}>
-      {children}
-    </SocketContext.Provider>
-  );
+  return <SocketContext.Provider value={clientRef.current}>{children}</SocketContext.Provider>;
 }
 
-export function useSocket(): Socket {
-  const socket = useContext(SocketContext);
-  if (!socket) {
-    throw new Error('useSocket must be used within a SocketProvider');
+export function useSocket(): Client {
+  const client = useContext(SocketContext);
+  if (!client) {
+    throw new Error('useSocket must be used within SocketProvider');
   }
-  return socket;
+  return client;
 }
