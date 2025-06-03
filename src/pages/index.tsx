@@ -33,20 +33,20 @@ function MainPage() {
     }
   }, [wallet, router]);
 
-  // Помогает закрыть текущее соединение, если оно есть
+  // Закрывает текущее соединение
   const closeSocket = () => {
     if (wsRef.current) {
-      console.log('>>> Closing existing WebSocket, readyState =', wsRef.current.readyState);
-      wsRef.current.onopen = null;
-      wsRef.current.onmessage = null;
-      wsRef.current.onclose = null;
-      wsRef.current.onerror = null;
-      wsRef.current.close();
+      console.log('Closing existing WebSocket, readyState =', wsRef.current.readyState);
+      const old = wsRef.current;
+      old.onopen = null;
+      old.onmessage = null;
+      old.onclose = null;
+      old.onerror = null;
+      old.close();
       wsRef.current = null;
     }
   };
 
-  // Основная функция: закрываем старый сокет, открываем новый и в onopen шлём auth→get_ton_proof
   const handleConnectClick = useCallback(() => {
     console.log('handleConnectClick invoked: ready=', ready);
     if (!ready) {
@@ -60,57 +60,54 @@ function MainPage() {
 
     tonConnectUI.setConnectRequestParameters({ state: 'loading' });
 
-    // 1) Закрываем предыдущее соединение, если оно существует
+    // 1) Закрываем предыдущее соединение
     closeSocket();
 
     // 2) Создаём новый WebSocket
-    console.log('>>> Creating new WebSocket to', WS_URL);
+    console.log('Creating new WebSocket to', WS_URL);
     const socket = new WebSocket(WS_URL);
     wsRef.current = socket;
 
     socket.onopen = () => {
-      console.log('>>> WebSocket.onopen, readyState=', socket.readyState);
+      console.log('WebSocket.onopen, readyState=', socket.readyState);
 
       // 2.1) Отправляем auth
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
-      console.log('>>> Sending auth:', { type: 'auth', initData });
+      console.log('Sending auth:', { type: 'auth', initData });
       socket.send(JSON.stringify({ type: 'auth', initData }));
-
-      // 2.2) Через 100 мс отправляем get_ton_proof
-      setTimeout(() => {
-        console.log('>>> Sending get_ton_proof');
-        socket.send(JSON.stringify({ type: 'get_ton_proof' }));
-      }, 100);
     };
 
     socket.onmessage = (event) => {
-      console.log('>>> WebSocket.onmessage:', event.data);
+      console.log('WebSocket.onmessage:', event.data);
       let data;
       try {
         data = JSON.parse(event.data);
       } catch (err) {
-        console.error('Failed to parse message JSON:', err);
+        console.error('Failed to parse WS message JSON:', err);
         return;
       }
 
-      // Если сервер вернул “Unauthorized” — повторяем auth→get_ton_proof
+      // Если сервер ответил, что auth принят (например, { type: 'auth_ok' })
+      if (data.type === 'auth_ok') {
+        console.log('Received auth_ok from server, sending get_ton_proof');
+        socket.send(JSON.stringify({ type: 'get_ton_proof' }));
+        return;
+      }
+
+      // Если сервер вернул “Unauthorized” — повторяем auth
       if (data.code === 1 && data.error?.includes('Unauthorized')) {
-        console.warn('>>> Received Unauthorized, retrying auth + get_ton_proof');
+        console.warn('Received Unauthorized, retrying auth');
         const tg = (window as any).Telegram?.WebApp;
         const initData = tg?.initData;
-        console.log('>>> Re-sending auth:', { type: 'auth', initData });
+        console.log('Re-sending auth:', { type: 'auth', initData });
         socket.send(JSON.stringify({ type: 'auth', initData }));
-        setTimeout(() => {
-          console.log('>>> Re-sending get_ton_proof');
-          socket.send(JSON.stringify({ type: 'get_ton_proof' }));
-        }, 100);
         return;
       }
 
       // Когда приходит challenge (ton_proof) — отдаем его TonConnect UI
       if (data.type === 'ton_proof' && data.value) {
-        console.log('>>> Received ton_proof, opening TonConnect modal');
+        console.log('Received ton_proof, opening TonConnect modal');
         tonConnectUI.setConnectRequestParameters({
           state: 'ready',
           value: { tonProof: data.value },
@@ -121,7 +118,7 @@ function MainPage() {
 
       // Если сервер вернул ошибку получения proof
       if (data.type === 'error_proof') {
-        console.error('>>> Received error_proof:', data);
+        console.error('Received error_proof:', data);
         setError(data.message || 'Ошибка получения tonProof');
         tonConnectUI.setConnectRequestParameters(null);
         setIsRequestingProof(false);
@@ -129,12 +126,11 @@ function MainPage() {
     };
 
     socket.onclose = (e) => {
-      console.warn('>>> WebSocket.onclose:', e.code, e.reason);
-      // При закрытии можно показать сообщение или попытаться переподключиться
+      console.warn('WebSocket.onclose:', e.code, e.reason);
     };
 
     socket.onerror = (err) => {
-      console.error('>>> WebSocket.onerror:', err);
+      console.error('WebSocket.onerror:', err);
       socket.close();
     };
   }, [ready, tonConnectUI]);
