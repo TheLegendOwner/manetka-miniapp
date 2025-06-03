@@ -12,12 +12,13 @@ function MainPage() {
   const tonConnectUI = useTonConnectUI()[0];
   const wallet = useTonWallet();
   const router = useRouter();
-  const { socket, connected } = useSocket();
+  const { socket, connected, authSent, sendAuth } = useSocket();
   const { ready } = useTelegram();
 
   const [isRequestingProof, setIsRequestingProof] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [delayedCheck, setDelayedCheck] = useState(false);
+  const [proofPending, setProofPending] = useState(false);
 
   // 1) Редирект, если кошелёк подключён
   useEffect(() => {
@@ -28,22 +29,6 @@ function MainPage() {
       return () => clearTimeout(timer);
     }
   }, [wallet, router]);
-
-  // Вспомогательная функция для отправки auth
-  const sendAuth = () => {
-    if (!socket) return;
-    const tg = (window as any).Telegram?.WebApp;
-    const initData = tg?.initData;
-    socket.send(JSON.stringify({ type: 'auth', initData }));
-    console.log('WS: auth sent');
-  };
-
-  // Вспомогательная функция для отправки get_ton_proof
-  const sendGetProof = () => {
-    if (!socket) return;
-    socket.send(JSON.stringify({ type: 'get_ton_proof' }));
-    console.log('WS: get_ton_proof sent');
-  };
 
   // 2) Обработка входящих по WebSocket сообщений
   useEffect(() => {
@@ -57,17 +42,15 @@ function MainPage() {
         return;
       }
 
-      // Если сервер вернул Unauthorized → заново шлём auth, затем get_ton_proof
+      // Если код 1 Unauthorized → заново отправляем auth, затем помечаем proofPending
       if (data.code === 1 && data.error?.includes('Unauthorized')) {
-        console.warn('WS: Unauthorized received, re-sending auth and get_ton_proof');
+        console.warn('WS: Unauthorized received, re-sending auth');
         sendAuth();
-        setTimeout(() => {
-          sendGetProof();
-        }, 100);
+        setProofPending(true); // после auth будет отправлен proof
         return;
       }
 
-      // Сервер прислал готовый challenge
+      // Когда пришёл ton_proof → запускаем TonConnect UI
       if (data.type === 'ton_proof' && data.value) {
         tonConnectUI.setConnectRequestParameters({
           state: 'ready',
@@ -77,7 +60,6 @@ function MainPage() {
         setIsRequestingProof(false);
       }
 
-      // Сервер вернул ошибку при выдаче proof
       if (data.type === 'error_proof') {
         setError(data.message || 'Ошибка получения tonProof');
         tonConnectUI.setConnectRequestParameters(null);
@@ -89,7 +71,7 @@ function MainPage() {
     return () => {
       socket.removeEventListener('message', onMessage);
     };
-  }, [socket, tonConnectUI]);
+  }, [socket, tonConnectUI, sendAuth]);
 
   // 3) Как только получен подписанный proof, отправляем verify
   useEffect(() => {
@@ -129,7 +111,16 @@ function MainPage() {
     socket.send(JSON.stringify(payloadToServer));
   }, [wallet, socket]);
 
-  // 4) По клику «Connect your TON Wallet»: отправляем auth, затем get_ton_proof
+  // 4) Если authSent изменился и у нас открыт pending proof → отправляем get_ton_proof
+  useEffect(() => {
+    if (authSent && proofPending && socket) {
+      socket.send(JSON.stringify({ type: 'get_ton_proof' }));
+      console.log('WS: get_ton_proof sent after auth');
+      setProofPending(false);
+    }
+  }, [authSent, proofPending, socket]);
+
+  // 5) По клику «Connect your TON Wallet»: помечаем pending и отправляем auth
   const handleConnectClick = useCallback(() => {
     if (!connected || !socket || !ready) {
       setError('Нет соединения с сервером или Telegram не готов');
@@ -140,14 +131,10 @@ function MainPage() {
 
     tonConnectUI.setConnectRequestParameters({ state: 'loading' });
 
-    // Сначала отправляем auth
+    // Устанавливаем «ожидание proof», затем вызываем sendAuth
+    setProofPending(true);
     sendAuth();
-
-    // Немного ждём, чтобы сервер успел обработать auth, и только потом шлём get_ton_proof
-    setTimeout(() => {
-      sendGetProof();
-    }, 100);
-  }, [connected, socket, tonConnectUI, ready]);
+  }, [connected, socket, tonConnectUI, ready, sendAuth]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
