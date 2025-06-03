@@ -29,6 +29,22 @@ function MainPage() {
     }
   }, [wallet, router]);
 
+  // Вспомогательная функция для отправки auth
+  const sendAuth = () => {
+    if (!socket) return;
+    const tg = (window as any).Telegram?.WebApp;
+    const initData = tg?.initData;
+    socket.send(JSON.stringify({ type: 'auth', initData }));
+    console.log('WS: auth sent');
+  };
+
+  // Вспомогательная функция для отправки get_ton_proof
+  const sendGetProof = () => {
+    if (!socket) return;
+    socket.send(JSON.stringify({ type: 'get_ton_proof' }));
+    console.log('WS: get_ton_proof sent');
+  };
+
   // 2) Обработка входящих по WebSocket сообщений
   useEffect(() => {
     if (!socket) return;
@@ -38,6 +54,16 @@ function MainPage() {
       try {
         data = JSON.parse(event.data);
       } catch {
+        return;
+      }
+
+      // Если сервер вернул Unauthorized → заново шлём auth, затем get_ton_proof
+      if (data.code === 1 && data.error?.includes('Unauthorized')) {
+        console.warn('WS: Unauthorized received, re-sending auth and get_ton_proof');
+        sendAuth();
+        setTimeout(() => {
+          sendGetProof();
+        }, 100);
         return;
       }
 
@@ -103,8 +129,7 @@ function MainPage() {
     socket.send(JSON.stringify(payloadToServer));
   }, [wallet, socket]);
 
-  // 4) По клику «Connect your TON Wallet»:
-  //    сначала отправляем auth, затем (через небольшой таймаут) get_ton_proof
+  // 4) По клику «Connect your TON Wallet»: отправляем auth, затем get_ton_proof
   const handleConnectClick = useCallback(() => {
     if (!connected || !socket || !ready) {
       setError('Нет соединения с сервером или Telegram не готов');
@@ -115,14 +140,12 @@ function MainPage() {
 
     tonConnectUI.setConnectRequestParameters({ state: 'loading' });
 
-    // 4.1 Отправляем auth вне зависимости от readyState (WebSocket уже открыт, connected === true)
-    const tg = (window as any).Telegram?.WebApp;
-    const initData = tg?.initData;
-    socket.send(JSON.stringify({ type: 'auth', initData }));
+    // Сначала отправляем auth
+    sendAuth();
 
-    // 4.2 Немного ждём, чтобы сервер гарантированно обработал auth, и только потом шлём get_ton_proof
+    // Немного ждём, чтобы сервер успел обработать auth, и только потом шлём get_ton_proof
     setTimeout(() => {
-      socket.send(JSON.stringify({ type: 'get_ton_proof' }));
+      sendGetProof();
     }, 100);
   }, [connected, socket, tonConnectUI, ready]);
 
