@@ -19,10 +19,10 @@ function MainPage() {
   const [error, setError] = useState<string | null>(null);
   const [delayedCheck, setDelayedCheck] = useState(false);
 
-  // Храним текущий WebSocket в ref
+  // Хранит текущее WebSocket-соединение
   const wsRef = useRef<WebSocket | null>(null);
 
-  // 1) Редирект, если кошелёк подключён
+  // 1) Редирект, если кошелёк уже подключён
   useEffect(() => {
     if ((wallet as any)?.account?.address) {
       router.replace('/wallet');
@@ -32,16 +32,16 @@ function MainPage() {
     }
   }, [wallet, router]);
 
-  // Помощник: закрыть старый WebSocket
+  // Помогает закрыть текущее соединение, если оно есть
   const closeSocket = () => {
     if (wsRef.current) {
-      console.log('>>> Закрываем старый WebSocket');
+      console.log('>>> Closing old WebSocket');
       wsRef.current.close();
       wsRef.current = null;
     }
   };
 
-  // Основная логика: создаём новый WebSocket → onopen: отправляем auth → через 100 мс get_ton_proof
+  // Основная функция: закрываем старый сокет, открываем новый и в onopen шлём auth→get_ton_proof
   const handleConnectClick = useCallback(() => {
     if (!ready) {
       setError('Telegram ещё не готов');
@@ -52,7 +52,7 @@ function MainPage() {
 
     tonConnectUI.setConnectRequestParameters({ state: 'loading' });
 
-    // 1) Закрываем старое соединение, если было
+    // 1) Закрываем предыдущее соединение, если оно существует
     closeSocket();
 
     // 2) Создаём новый WebSocket
@@ -60,15 +60,15 @@ function MainPage() {
     wsRef.current = socket;
 
     socket.onopen = () => {
-      console.log('>>> new WebSocket OPEN. sending auth now');
-
-      // 2.1) Отправка auth
+      console.log('>>> WebSocket opened, sending auth now');
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
+
+      // Отправляем auth
       socket.send(JSON.stringify({ type: 'auth', initData }));
       console.log('>>> auth sent:', { type: 'auth', initData });
 
-      // 2.2) Через 100 мс отправка get_ton_proof
+      // Спустя 100 мс отправляем get_ton_proof
       setTimeout(() => {
         console.log('>>> sending get_ton_proof');
         socket.send(JSON.stringify({ type: 'get_ton_proof' }));
@@ -84,10 +84,9 @@ function MainPage() {
       }
       console.log('>>> WS message:', data);
 
-      // Если получили code:1 Unauthorized, повторяем auth→get_ton_proof
+      // Если сервер вернул “Unauthorized” — повторяем auth→get_ton_proof
       if (data.code === 1 && data.error?.includes('Unauthorized')) {
-        console.warn('>>> Received Unauthorized, retrying auth+get_ton_proof');
-        // повторяем 1) auth
+        console.warn('>>> Received Unauthorized, retrying auth + get_ton_proof');
         const tg = (window as any).Telegram?.WebApp;
         const initData = tg?.initData;
         socket.send(JSON.stringify({ type: 'auth', initData }));
@@ -97,7 +96,7 @@ function MainPage() {
         return;
       }
 
-      // Когда приходит ton_proof → открываем TonConnect UI
+      // Когда приходит challenge (ton_proof) — отдаем его TonConnect UI
       if (data.type === 'ton_proof' && data.value) {
         tonConnectUI.setConnectRequestParameters({
           state: 'ready',
@@ -107,7 +106,7 @@ function MainPage() {
         setIsRequestingProof(false);
       }
 
-      // Ошибка proof
+      // Если сервер вернул ошибку получения proof
       if (data.type === 'error_proof') {
         setError(data.message || 'Ошибка получения tonProof');
         tonConnectUI.setConnectRequestParameters(null);
@@ -116,15 +115,15 @@ function MainPage() {
     };
 
     socket.onclose = (e) => {
-      console.warn('>>> WS closed', e.code, e.reason);
-      // В следующем клике создадим новый, здесь ничего не делаем
+      console.warn('>>> WS closed:', e.code, e.reason);
+      // Ничего дополнительно делать не надо — при следующем клике создадим новый
     };
 
     socket.onerror = (err) => {
-      console.error('>>> WS error', err);
+      console.error('>>> WS error:', err);
       socket.close();
     };
-  }, [ready, tonConnectUI]);
+  }, [ready, tonConnectUI, router]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
