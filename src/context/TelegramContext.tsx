@@ -1,3 +1,4 @@
+// src/context/TelegramContext.tsx
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
 export interface TelegramUser {
@@ -25,11 +26,39 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
     const tg = (window as any).Telegram?.WebApp;
     if (!tg) return;
 
+    // Вызвать метод ready WebApp
     tg.ready();
-    setReady(true);
 
-    const initUser = tg.initDataUnsafe?.user as TelegramUser | undefined;
-    if (initUser) setUser(initUser);
+    const initData = tg.initData;
+    if (!initData) {
+      // Если нет initData, сразу отмечаем готовность без пользователя
+      setReady(true);
+      return;
+    }
+
+    // Валидируем initData на сервере
+    fetch('/api/validate-initdata', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok) {
+          const initUser = tg.initDataUnsafe?.user as TelegramUser | undefined;
+          if (initUser) {
+            setUser(initUser);
+          }
+        } else {
+          console.error('Invalid Telegram initData');
+        }
+      })
+      .catch((err) => {
+        console.error('Error validating initData:', err);
+      })
+      .finally(() => {
+        setReady(true);
+      });
   }, []);
 
   return (

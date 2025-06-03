@@ -1,18 +1,30 @@
+// src/context/WebSocketContext.tsx
 'use client';
 
-import React, { createContext, useContext, useEffect, useRef, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  ReactNode,
+} from 'react';
 import { useTelegram } from './TelegramContext';
 
-// URL вашего Spring WebSocketHandler endpoint (например, wss://api.your-domain.com/ws)
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL as string;
 
-// Контекст для WebSocket
-const SocketContext = createContext<WebSocket | null>(null);
+interface SocketContextValue {
+  socket: WebSocket | null;
+  connected: boolean;
+}
+
+const SocketContext = createContext<SocketContextValue>({ socket: null, connected: false });
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   const { ready } = useTelegram();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     if (!WS_URL) {
@@ -21,14 +33,16 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     }
 
     let socket: WebSocket;
-    let connect = () => {
+
+    const connect = () => {
       console.log('WS: connecting to', WS_URL);
       socket = new WebSocket(WS_URL);
       wsRef.current = socket;
 
       socket.onopen = () => {
         console.log('WS: connected');
-        // Отправляем auth, когда Telegram готов
+        setConnected(true);
+
         if (ready) {
           const tg = (window as any).Telegram?.WebApp;
           const initData = tg?.initData;
@@ -38,18 +52,18 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         }
       };
 
-      socket.onmessage = event => {
+      socket.onmessage = (event) => {
         console.log('WS: message received', event.data);
-        // Здесь можно парсить JSON и диспатчить события
+        // Здесь можно парсить JSON и обрабатывать другие типы сообщений (например, ton_proof, verify_result)
       };
 
-      socket.onclose = e => {
+      socket.onclose = (e) => {
         console.warn('WS: closed', e.code, e.reason);
-        // Попытка переподключения через 5 секунд
+        setConnected(false);
         reconnectRef.current = window.setTimeout(connect, 5000);
       };
 
-      socket.onerror = err => {
+      socket.onerror = (err) => {
         console.error('WS: error', err);
         socket.close();
       };
@@ -65,20 +79,17 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         wsRef.current.close();
       }
       wsRef.current = null;
+      setConnected(false);
     };
   }, [ready]);
 
   return (
-    <SocketContext.Provider value={wsRef.current}>
+    <SocketContext.Provider value={{ socket: wsRef.current, connected }}>
       {children}
     </SocketContext.Provider>
   );
 }
 
-export function useSocket(): WebSocket {
-  const socket = useContext(SocketContext);
-  if (!socket) {
-    throw new Error('useSocket must be used within a SocketProvider');
-  }
-  return socket;
+export function useSocket(): SocketContextValue {
+  return useContext(SocketContext);
 }
