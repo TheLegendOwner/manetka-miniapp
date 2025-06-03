@@ -53,7 +53,7 @@ function MainPage() {
     tonConnectUI.setConnectRequestParameters({ state: 'loading' });
 
     // 1) Закрываем предыдущее соединение, если оно существует
-    closeSocket();
+    //closeSocket();
 
     // 2) Создаём новый WebSocket
     const socket = new WebSocket(WS_URL);
