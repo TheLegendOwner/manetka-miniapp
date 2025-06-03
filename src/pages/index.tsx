@@ -41,19 +41,6 @@ function MainPage() {
         return;
       }
 
-      // Сервер прислал ответ с кодом ошибки
-      if (data.code === 1 && data.error?.includes('Unauthorized')) {
-        // Сначала отправляем auth заново
-        const tg = (window as any).Telegram?.WebApp;
-        const initData = tg?.initData;
-        socket.send(JSON.stringify({ type: 'auth', initData }));
-        console.log('WS: re-sent auth');
-        // Затем повторяем get_ton_proof
-        socket.send(JSON.stringify({ type: 'get_ton_proof' }));
-        console.log('WS: retried get_ton_proof');
-        return;
-      }
-
       // Сервер прислал готовый challenge
       if (data.type === 'ton_proof' && data.value) {
         tonConnectUI.setConnectRequestParameters({
@@ -116,8 +103,8 @@ function MainPage() {
     socket.send(JSON.stringify(payloadToServer));
   }, [wallet, socket]);
 
-  // 4) По клику «Connect your TON Wallet» — отправляем get_ton_proof,
-  //    но только если есть соединение и Telegram уже готов (auth отправлен)
+  // 4) По клику «Connect your TON Wallet»:
+  //    сначала отправляем auth, затем (через небольшой таймаут) get_ton_proof
   const handleConnectClick = useCallback(() => {
     if (!connected || !socket || !ready) {
       setError('Нет соединения с сервером или Telegram не готов');
@@ -127,7 +114,16 @@ function MainPage() {
     setIsRequestingProof(true);
 
     tonConnectUI.setConnectRequestParameters({ state: 'loading' });
-    socket.send(JSON.stringify({ type: 'get_ton_proof' }));
+
+    // 4.1 Отправляем auth вне зависимости от readyState (WebSocket уже открыт, connected === true)
+    const tg = (window as any).Telegram?.WebApp;
+    const initData = tg?.initData;
+    socket.send(JSON.stringify({ type: 'auth', initData }));
+
+    // 4.2 Немного ждём, чтобы сервер гарантированно обработал auth, и только потом шлём get_ton_proof
+    setTimeout(() => {
+      socket.send(JSON.stringify({ type: 'get_ton_proof' }));
+    }, 100);
   }, [connected, socket, tonConnectUI, ready]);
 
   return (
