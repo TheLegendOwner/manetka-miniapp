@@ -25,8 +25,19 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
   const [connected, setConnected] = useState(false);
-  // Флаг: «успешно отправили auth»
   const authSentRef = useRef(false);
+
+  // Функция для отправки auth — определяем в этом же скоупе
+  function sendAuth() {
+    const socket = wsRef.current;
+    if (!socket) return;
+    const tg = (window as any).Telegram?.WebApp;
+    const initData = tg?.initData;
+    const msg = { type: 'auth', initData };
+    socket.send(JSON.stringify(msg));
+    console.log('WS: auth sent', msg);
+    authSentRef.current = true;
+  }
 
   useEffect(() => {
     if (!WS_URL) {
@@ -40,14 +51,13 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       console.log('WS: connecting to', WS_URL);
       socket = new WebSocket(WS_URL);
       wsRef.current = socket;
-      authSentRef.current = false; // сбрасываем, чтобы повторно попытаться прислать auth
+      authSentRef.current = false;
 
       socket.onopen = () => {
         console.log('WS: connected');
         setConnected(true);
 
-        // Если сразу готовы, отправляем auth;
-        // иначе — ждём, пока ready станет true (см. ниже дополнительный useEffect)
+        // Если Telegram уже готов, отправляем auth
         if (ready) {
           sendAuth();
         }
@@ -55,13 +65,12 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
       socket.onmessage = (event) => {
         console.log('WS: message received', event.data);
-        // Здесь можно парсить JSON в application code
+        // Здесь можно обрабатывать входящие сообщения
       };
 
       socket.onclose = (e) => {
         console.warn('WS: closed', e.code, e.reason);
         setConnected(false);
-        // Через 5 секунд переподключаемся
         reconnectRef.current = window.setTimeout(connect, 5000);
       };
 
@@ -84,23 +93,13 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setConnected(false);
       authSentRef.current = false;
     };
-  }, []); // запускаем только один раз при маунте
+  }, []);
 
-  // Если ready переходит в true и сокет уже открыт, но мы ещё не отправили auth — отправляем
+  // Когда Telegram становится ready, если сокет открыт и auth ещё не отправлен — отправляем
   useEffect(() => {
     const socket = wsRef.current;
     if (ready && socket && socket.readyState === WebSocket.OPEN && !authSentRef.current) {
       sendAuth();
-    }
-
-    function sendAuth() {
-      if (!socket) return;
-      const tg = (window as any).Telegram?.WebApp;
-      const initData = tg?.initData;
-      const msg = { type: 'auth', initData };
-      socket.send(JSON.stringify(msg));
-      console.log('WS: auth sent', msg);
-      authSentRef.current = true;
     }
   }, [ready]);
 
