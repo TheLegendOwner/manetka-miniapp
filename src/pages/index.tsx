@@ -41,7 +41,6 @@ function MainPage() {
         return;
       }
 
-      // Сервер прислал готовый challenge
       if (data.type === 'ton_proof' && data.value) {
         tonConnectUI.setConnectRequestParameters({
           state: 'ready',
@@ -51,7 +50,6 @@ function MainPage() {
         setIsRequestingProof(false);
       }
 
-      // Сервер вернул ошибку при выдаче proof
       if (data.type === 'error_proof') {
         setError(data.message || 'Ошибка получения tonProof');
         tonConnectUI.setConnectRequestParameters(null);
@@ -103,8 +101,7 @@ function MainPage() {
     socket.send(JSON.stringify(payloadToServer));
   }, [wallet, socket]);
 
-  // 4) По клику «Connect your TON Wallet» — отправляем get_ton_proof,
-  //    но только если есть соединение и Telegram уже готов (auth отправлен)
+  // 4) По клику «Connect your TON Wallet» — отправляем get_ton_proof
   const handleConnectClick = useCallback(() => {
     if (!connected || !socket || !ready) {
       setError('Нет соединения с сервером или Telegram не готов');

@@ -25,21 +25,20 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
   const [connected, setConnected] = useState(false);
-  const authSentRef = useRef(false);
 
-  // Функция для отправки auth — определяем в этом же скоупе
   function sendAuth() {
     const socket = wsRef.current;
-    if (!socket) return;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
     const tg = (window as any).Telegram?.WebApp;
     const initData = tg?.initData;
     const msg = { type: 'auth', initData };
     socket.send(JSON.stringify(msg));
     console.log('WS: auth sent', msg);
-    authSentRef.current = true;
   }
 
   useEffect(() => {
+    // Откладываем подключение, пока TelegramContext не станет ready
+    if (!ready) return;
     if (!WS_URL) {
       console.error('WebSocket URL not defined');
       return;
@@ -51,21 +50,16 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       console.log('WS: connecting to', WS_URL);
       socket = new WebSocket(WS_URL);
       wsRef.current = socket;
-      authSentRef.current = false;
 
       socket.onopen = () => {
         console.log('WS: connected');
         setConnected(true);
-
-        // Если Telegram уже готов, отправляем auth
-        if (ready) {
-          sendAuth();
-        }
+        // Сразу отправляем auth — Telegram уже ready при подключении
+        sendAuth();
       };
 
       socket.onmessage = (event) => {
         console.log('WS: message received', event.data);
-        // Здесь можно обрабатывать входящие сообщения
       };
 
       socket.onclose = (e) => {
@@ -91,16 +85,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       }
       wsRef.current = null;
       setConnected(false);
-      authSentRef.current = false;
     };
-  }, []);
-
-  // Когда Telegram становится ready, если сокет открыт и auth ещё не отправлен — отправляем
-  useEffect(() => {
-    const socket = wsRef.current;
-    if (ready && socket && socket.readyState === WebSocket.OPEN && !authSentRef.current) {
-      sendAuth();
-    }
   }, [ready]);
 
   return (
