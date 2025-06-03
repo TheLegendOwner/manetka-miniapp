@@ -6,18 +6,20 @@ import { useEffect, useState, useCallback } from 'react';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useRouter } from 'next/router';
 import { useSocket } from '../context/WebSocketContext';
+import { useTelegram } from '../context/TelegramContext';
 
 function MainPage() {
   const tonConnectUI = useTonConnectUI()[0];
   const wallet = useTonWallet();
   const router = useRouter();
   const { socket, connected } = useSocket();
+  const { ready } = useTelegram();
 
   const [isRequestingProof, setIsRequestingProof] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [delayedCheck, setDelayedCheck] = useState(false);
 
-  // 1) Если кошелёк уже подключён → редирект на /wallet
+  // 1) Редирект, если кошелёк подключён
   useEffect(() => {
     if ((wallet as any)?.account?.address) {
       router.replace('/wallet');
@@ -27,7 +29,7 @@ function MainPage() {
     }
   }, [wallet, router]);
 
-  // 2) Слушаем приходящие WebSocket-сообщения
+  // 2) Обработка входящих по WebSocket сообщений
   useEffect(() => {
     if (!socket) return;
 
@@ -39,7 +41,7 @@ function MainPage() {
         return;
       }
 
-      // Сервер выдал готовый tonProof (challenge)
+      // Сервер прислал готовый challenge
       if (data.type === 'ton_proof' && data.value) {
         tonConnectUI.setConnectRequestParameters({
           state: 'ready',
@@ -55,9 +57,6 @@ function MainPage() {
         tonConnectUI.setConnectRequestParameters(null);
         setIsRequestingProof(false);
       }
-
-      // Обработать verify_result, если нужно
-      // if (data.type === 'verify_result') { … }
     };
 
     socket.addEventListener('message', onMessage);
@@ -66,7 +65,7 @@ function MainPage() {
     };
   }, [socket, tonConnectUI]);
 
-  // 3) Когда wallet получил подписанный proof, отправляем серверу { type: 'verify', … }
+  // 3) Как только получен подписанный proof, отправляем verify
   useEffect(() => {
     if (!wallet || !socket) return;
 
@@ -104,10 +103,11 @@ function MainPage() {
     socket.send(JSON.stringify(payloadToServer));
   }, [wallet, socket]);
 
-  // 4) При клике «Connect your TON Wallet»
+  // 4) По клику «Connect your TON Wallet» — отправляем get_ton_proof,
+  //    но только если есть соединение и Telegram уже готов (auth отправлен)
   const handleConnectClick = useCallback(() => {
-    if (!connected || !socket) {
-      setError('Нет соединения с сервером');
+    if (!connected || !socket || !ready) {
+      setError('Нет соединения с сервером или Telegram не готов');
       return;
     }
     setError(null);
@@ -115,7 +115,7 @@ function MainPage() {
 
     tonConnectUI.setConnectRequestParameters({ state: 'loading' });
     socket.send(JSON.stringify({ type: 'get_ton_proof' }));
-  }, [connected, socket, tonConnectUI]);
+  }, [connected, socket, tonConnectUI, ready]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
@@ -138,9 +138,7 @@ function MainPage() {
               isRequestingProof ? 'bg-gray-300' : 'bg-[#EBB923] hover:bg-[#e2aa14]'
             } text-gray-900 font-semibold text-base rounded-full shadow-md transition-colors duration-200`}
           >
-            {isRequestingProof
-              ? 'Подготовка...'
-              : 'Connect your TON Wallet'}
+            {isRequestingProof ? 'Подготовка...' : 'Connect your TON Wallet'}
           </button>
         </div>
       )}
