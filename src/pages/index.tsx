@@ -2,23 +2,25 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useRouter } from 'next/router';
-import { useSocket } from '../context/WebSocketContext';
 import { useTelegram } from '../context/TelegramContext';
+
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL as string;
 
 function MainPage() {
   const tonConnectUI = useTonConnectUI()[0];
   const wallet = useTonWallet();
   const router = useRouter();
-  const { socket, connected, authSent, sendAuth } = useSocket();
   const { ready } = useTelegram();
 
   const [isRequestingProof, setIsRequestingProof] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [delayedCheck, setDelayedCheck] = useState(false);
-  const [proofPending, setProofPending] = useState(false);
+
+  // Храним текущий WebSocket в ref
+  const wsRef = useRef<WebSocket | null>(null);
 
   // 1) Редирект, если кошелёк подключён
   useEffect(() => {
@@ -30,27 +32,72 @@ function MainPage() {
     }
   }, [wallet, router]);
 
-  // 2) Обработка входящих по WebSocket сообщений
-  useEffect(() => {
-    if (!socket) return;
+  // Помощник: закрыть старый WebSocket
+  const closeSocket = () => {
+    if (wsRef.current) {
+      console.log('>>> Закрываем старый WebSocket');
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  };
 
-    const onMessage = (event: MessageEvent) => {
+  // Основная логика: создаём новый WebSocket → onopen: отправляем auth → через 100 мс get_ton_proof
+  const handleConnectClick = useCallback(() => {
+    if (!ready) {
+      setError('Telegram ещё не готов');
+      return;
+    }
+    setError(null);
+    setIsRequestingProof(true);
+
+    tonConnectUI.setConnectRequestParameters({ state: 'loading' });
+
+    // 1) Закрываем старое соединение, если было
+    closeSocket();
+
+    // 2) Создаём новый WebSocket
+    const socket = new WebSocket(WS_URL);
+    wsRef.current = socket;
+
+    socket.onopen = () => {
+      console.log('>>> new WebSocket OPEN. sending auth now');
+
+      // 2.1) Отправка auth
+      const tg = (window as any).Telegram?.WebApp;
+      const initData = tg?.initData;
+      socket.send(JSON.stringify({ type: 'auth', initData }));
+      console.log('>>> auth sent:', { type: 'auth', initData });
+
+      // 2.2) Через 100 мс отправка get_ton_proof
+      setTimeout(() => {
+        console.log('>>> sending get_ton_proof');
+        socket.send(JSON.stringify({ type: 'get_ton_proof' }));
+      }, 100);
+    };
+
+    socket.onmessage = (event) => {
       let data;
       try {
         data = JSON.parse(event.data);
       } catch {
         return;
       }
+      console.log('>>> WS message:', data);
 
-      // Если код 1 Unauthorized → заново отправляем auth, затем помечаем proofPending
+      // Если получили code:1 Unauthorized, повторяем auth→get_ton_proof
       if (data.code === 1 && data.error?.includes('Unauthorized')) {
-        console.warn('WS: Unauthorized received, re-sending auth');
-        sendAuth();
-        setProofPending(true); // после auth будет отправлен proof
+        console.warn('>>> Received Unauthorized, retrying auth+get_ton_proof');
+        // повторяем 1) auth
+        const tg = (window as any).Telegram?.WebApp;
+        const initData = tg?.initData;
+        socket.send(JSON.stringify({ type: 'auth', initData }));
+        setTimeout(() => {
+          socket.send(JSON.stringify({ type: 'get_ton_proof' }));
+        }, 100);
         return;
       }
 
-      // Когда пришёл ton_proof → запускаем TonConnect UI
+      // Когда приходит ton_proof → открываем TonConnect UI
       if (data.type === 'ton_proof' && data.value) {
         tonConnectUI.setConnectRequestParameters({
           state: 'ready',
@@ -60,6 +107,7 @@ function MainPage() {
         setIsRequestingProof(false);
       }
 
+      // Ошибка proof
       if (data.type === 'error_proof') {
         setError(data.message || 'Ошибка получения tonProof');
         tonConnectUI.setConnectRequestParameters(null);
@@ -67,74 +115,16 @@ function MainPage() {
       }
     };
 
-    socket.addEventListener('message', onMessage);
-    return () => {
-      socket.removeEventListener('message', onMessage);
-    };
-  }, [socket, tonConnectUI, sendAuth]);
-
-  // 3) Как только получен подписанный proof, отправляем verify
-  useEffect(() => {
-    if (!wallet || !socket) return;
-
-    const tonProof = (wallet as any).tonProof;
-    const account = {
-      address: (wallet as any)?.account?.address || '',
-      public_key: (wallet as any)?.account?.publicKey || '',
-      chain: (wallet as any)?.account?.chain || 0,
-      wallet_state_init: (wallet as any)?.account?.walletStateInit || '',
+    socket.onclose = (e) => {
+      console.warn('>>> WS closed', e.code, e.reason);
+      // В следующем клике создадим новый, здесь ничего не делаем
     };
 
-    if (
-      !tonProof ||
-      !account.address ||
-      !account.public_key ||
-      !account.wallet_state_init
-    ) {
-      return;
-    }
-
-    const payloadToServer = {
-      type: 'verify',
-      proof: {
-        timestamp: tonProof.timestamp,
-        domain: {
-          length_bytes: tonProof.domain.lengthBytes,
-          value: tonProof.domain.value,
-        },
-        signature: tonProof.signature,
-        payload: tonProof.payload,
-      },
-      account,
+    socket.onerror = (err) => {
+      console.error('>>> WS error', err);
+      socket.close();
     };
-
-    socket.send(JSON.stringify(payloadToServer));
-  }, [wallet, socket]);
-
-  // 4) Если authSent изменился и у нас открыт pending proof → отправляем get_ton_proof
-  useEffect(() => {
-    if (authSent && proofPending && socket) {
-      socket.send(JSON.stringify({ type: 'get_ton_proof' }));
-      console.log('WS: get_ton_proof sent after auth');
-      setProofPending(false);
-    }
-  }, [authSent, proofPending, socket]);
-
-  // 5) По клику «Connect your TON Wallet»: помечаем pending и отправляем auth
-  const handleConnectClick = useCallback(() => {
-    if (!connected || !socket || !ready) {
-      setError('Нет соединения с сервером или Telegram не готов');
-      return;
-    }
-    setError(null);
-    setIsRequestingProof(true);
-
-    tonConnectUI.setConnectRequestParameters({ state: 'loading' });
-
-    // Устанавливаем «ожидание proof», затем вызываем sendAuth
-    setProofPending(true);
-    sendAuth();
-  }, [connected, socket, tonConnectUI, ready, sendAuth]);
+  }, [ready, tonConnectUI]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
