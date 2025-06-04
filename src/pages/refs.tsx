@@ -1,3 +1,4 @@
+// src/pages/refs.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -30,7 +31,8 @@ export default function RefsPage() {
   const wallet = useTonWallet();
   const [referralLink, setReferralLink] = useState('');
 
-  // 1) Ждём ready === true, а затем, если user===null или wallet===null, редиректим
+  // 1) Ждём, пока TelegramContext.ready === true, и useTonWallet() перестанет быть undefined
+  //    Если wallet === null или user === null, делаем редирект на "/"
   useEffect(() => {
     if (ready) {
       if (!user || wallet === null) {
@@ -39,23 +41,37 @@ export default function RefsPage() {
     }
   }, [ready, user, wallet, router]);
 
-  // 2) Как только ready===true и user!==null, строим ссылку
+  // 2) Как только ready===true и user!==null, формируем referralLink
   useEffect(() => {
     if (ready && user) {
       setReferralLink(`https://t.me/manetka_bot/app?startapp=ref${user.id}`);
     }
   }, [ready, user]);
 
-  // 3) Здесь проверяем все условия до рендера:
-  //    - если ready===false → ещё не инициализировались → возвращаем null
-  //    - или если wallet===undefined (ещё хук инициализируется) → возвращаем null
-  //    - или если wallet===null (нет кошелька) → возвращаем null (и одновременно в useEffect будет редирект)
-  //    - или если user===null (нет авторизации Telegram) → возвращаем null
+  // 3) Пока ещё не готовы данные (ready false), или wallet ещё undefined, 
+  //    или wallet null (редиректится), или user null (редиректится) — возвращаем null
   if (!ready || wallet === undefined || wallet === null || !user) {
     return null;
   }
 
-  // 4) Дальше безопасно: ready===true, wallet!==undefined и !==null, user!==null.
+  // 4) Функция копирования ссылки
+  const copyReferral = () => {
+    if (referralLink) {
+      navigator.clipboard.writeText(referralLink);
+    }
+  };
+
+  // 5) Функция шаринга (Web Share API или alert)
+  const shareReferral = () => {
+    if (!referralLink) return;
+    const shareText = `${t('join_manetka')}: ${referralLink}`;
+    if (navigator.share) {
+      navigator.share({ title: 'Manetka', text: shareText, url: referralLink });
+    } else {
+      alert(t('share_not_supported'));
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB] font-['Aboreto']">
       {/* Header */}
