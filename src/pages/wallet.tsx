@@ -1,4 +1,3 @@
-// src/pages/wallet.tsx
 'use client';
 
 import { useEffect } from 'react';
@@ -40,21 +39,27 @@ export default function WalletPage() {
   const { t } = useTranslation();
   const { user, ready } = useTelegram();
   const wallet = useTonWallet();
-const avatarSrc =
-    user?.photo_url || `/icons/avatar${Math.floor(Math.random() * 11) + 1}.svg`;
-	
-	
+
+  // 1) Если TelegramContext.ready === false, сразу возвращаем null
+  if (!ready) {
+    return null;
+  }
+
+  // 2) Если useTonWallet() ещё undefined, возвращаем null (не читать wallet.account)
+  if (wallet === undefined) {
+    return null;
+  }
+
+  // 3) Если ready === true, но user=null ИЛИ wallet=null → редиректим на "/"
   useEffect(() => {
-    if (ready) {
-      if (!user || wallet === null) {
-        router.replace('/');
-      }
+    if (wallet === null || !user) {
+      router.replace('/');
     }
   }, [ready, user, wallet, router]);
 
-  if (!ready || wallet === undefined || wallet === null) {
-    return null;
-  }
+  // 4) Ещё раз: пока wallet===null или undefined, выше либо вернули null, либо редиректнули.
+  //    Это значит, к моменту, когда мы дойдём до return ниже, 
+  //    wallet гарантированно НЕ undefined, и далее в JSX можно обращаться к wallet.account.address.
 
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB] font-['Aboreto']">
@@ -67,6 +72,7 @@ const avatarSrc =
           className="w-9 h-9 rounded-full overflow-hidden cursor-pointer"
           onClick={() => router.push('/account')}
         >
+          {/* Здесь avatarSrc берёт user?.photo_url, а user гарантированно не null */}
           <Image
             src={user?.photo_url || '/icons/avatar_default.svg'}
             alt="avatar"

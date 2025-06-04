@@ -1,4 +1,3 @@
-// src/pages/account.tsx
 'use client';
 
 import { useEffect } from 'react';
@@ -24,23 +23,30 @@ export default function AccountPage() {
   const [tonConnectUI] = useTonConnectUI();
   const wallet = useTonWallet();
 
+  // 1) Если TelegramContext.ready ещё false — показываем “Инициализация Telegram…”
   if (!ready) {
     return <p>Инициализация Telegram...</p>;
   }
 
+  // 2) Если useTonWallet() ещё возвращает undefined (манипуляции внутри TonConnect UI ещё не завершены) — return null
   if (wallet === undefined) {
     return null;
   }
 
+  // 3) Если и user отсутствует, и wallet === null — показываем простой текст, но не рендерим более сложный UI
   if (!user && wallet === null) {
     return <p>Данные пользователя недоступны.</p>;
   }
 
+  // 4) Если ready===true, но wallet стал === null (значит пользователь разлогинился), делаем редирект
   useEffect(() => {
     if (wallet === null) {
       router.replace('/');
     }
   }, [wallet, router]);
+
+  // 5) К этому моменту гарантировано: ready===true, wallet!==undefined, и не оба null одновременно.
+  //    Поэтому дальше безопасно читать user?.first_name, wallet.account.address и т.д.
 
   const avatarSrc =
     user?.photo_url || `/icons/avatar${Math.floor(Math.random() * 11) + 1}.svg`;
@@ -84,7 +90,7 @@ export default function AccountPage() {
           </button>
           <button
             onClick={() => i18n.changeLanguage('en')}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition ${
+            className={`px-3 py-1 rounded-full текст-sm font-medium transition ${
               i18n.language === 'en' ? 'bg-[#EBB923] text-black' : 'text-gray-500'
             }`}
           >

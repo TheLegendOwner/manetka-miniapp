@@ -1,4 +1,3 @@
-// src/pages/index.tsx
 'use client';
 
 import dynamic from 'next/dynamic';
@@ -10,22 +9,24 @@ import { useTelegram } from '../context/TelegramContext';
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL as string;
 
 function MainPage() {
-const [tonConnectUI] = useTonConnectUI();
-const wallet = useTonWallet();
+  const [tonConnectUI] = useTonConnectUI();
+  const wallet = useTonWallet();
   const router = useRouter();
   const { ready } = useTelegram();
 
   const [isRequestingProof, setIsRequestingProof] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [delayedCheck, setDelayedCheck] = useState(false);
-
-  // Хранит текущее WebSocket-соединение
   const wsRef = useRef<WebSocket | null>(null);
-
-  // Реф для предотвращения повторного редиректа
   const hasRedirectedRef = useRef(false);
 
-  // 1) Редирект на /wallet, но только если мы на "/" и ещё не редиректили
+  // 1) Ждём, пока TelegramContext.ready === true И useTonWallet() уже != undefined
+  //    Если wallet === undefined, просто вернём null, чтобы не получить ошибку при чтении wallet.account
+  if (!ready || wallet === undefined) {
+    return null;
+  }
+
+  // 2) Если кошелёк подключён и мы всё ещё на "/", редиректим 1 раз
   useEffect(() => {
     if (router.pathname !== '/') return;
     if (!hasRedirectedRef.current && (wallet as any)?.account?.address) {
@@ -34,12 +35,23 @@ const wallet = useTonWallet();
     }
   }, [wallet, router]);
 
-  // Если кошелëк уже подключён, не рендерим ничего (чтобы не триггерить useEffect снова)
+  // 3) Как только wallet перестал быть undefined (теперь либо объект, либо null),
+  //    если оказался просто null (то есть пользователь не подключил кошелёк), 
+  //    — запускаем таймер на показ кнопки "Connect"
+  useEffect(() => {
+    if (wallet === null) {
+      const timer = setTimeout(() => setDelayedCheck(true), 500);
+      return () => clearTimeout(timer);
+    }
+    // Если wallet — уже объект (кошелек подключён), мы вернём null ниже
+  }, [wallet]);
+
+  // 4) Если кошелёк подключён, сразу возвращаем null (и редирект выше уже запущен)
   if ((wallet as any)?.account?.address) {
     return null;
   }
 
-  // Закрывает текущее соединение
+  // 5) Остальная WebSocket-логика (запускается только когда ready===true и wallet!==undefined)
   const closeSocket = () => {
     if (wsRef.current) {
       const old = wsRef.current;
@@ -52,27 +64,18 @@ const wallet = useTonWallet();
     }
   };
 
-  // 2) Создание и работа с WebSocket при клике
   const handleConnectClick = useCallback(() => {
-    if (!ready) {
-      setError('Telegram ещё не готов');
-      return;
-    }
-
+    // Здесь ready уже true и wallet !== undefined
     setError(null);
     setIsRequestingProof(true);
 
     tonConnectUI.setConnectRequestParameters({ state: 'loading' });
-
-    // Закрываем прошлый сокет
     closeSocket();
 
-    // Создаём новый WebSocket
     const socket = new WebSocket(WS_URL);
     wsRef.current = socket;
 
     socket.onopen = () => {
-      // Отправляем auth
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
       socket.send(JSON.stringify({ type: 'auth', initData }));
@@ -86,13 +89,11 @@ const wallet = useTonWallet();
         return;
       }
 
-      // Если сервер подтвердил auth (type="auth", code=0) → отправляем get_ton_proof
       if (data.type === 'auth' && data.code === 0) {
         socket.send(JSON.stringify({ type: 'get_ton_proof' }));
         return;
       }
 
-      // Если сервер вернул Unauthorized → повторяем auth
       if (data.code === 1 && data.error?.includes('Unauthorized')) {
         const tg = (window as any).Telegram?.WebApp;
         const initData = tg?.initData;
@@ -100,7 +101,6 @@ const wallet = useTonWallet();
         return;
       }
 
-      // Когда приходит challenge (ton_proof) → открываем TonConnect UI
       if (data.type === 'ton_proof' && data.value) {
         tonConnectUI.setConnectRequestParameters({
           state: 'ready',
@@ -110,7 +110,6 @@ const wallet = useTonWallet();
         setIsRequestingProof(false);
       }
 
-      // Если сервер вернул ошибку получения proof
       if (data.type === 'error_proof') {
         setError(data.message || 'Ошибка получения tonProof');
         tonConnectUI.setConnectRequestParameters(null);
@@ -118,10 +117,7 @@ const wallet = useTonWallet();
       }
     };
 
-    socket.onclose = () => {
-      // Ничего делать не нужно
-    };
-
+    socket.onclose = () => {};
     socket.onerror = () => {
       socket.close();
     };
@@ -139,7 +135,7 @@ const wallet = useTonWallet();
         </p>
       </div>
 
-      {!delayedCheck && !((wallet as any)?.account?.address) && (
+      {delayedCheck && (
         <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
           <button
             onClick={handleConnectClick}
