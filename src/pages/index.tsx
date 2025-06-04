@@ -88,9 +88,9 @@ function MainPage() {
         return;
       }
 
-      // Если сервер ответил, что auth принят (например, { type: 'auth_ok' })
-      if (data.type === 'auth_ok') {
-        console.log('Received auth_ok from server, sending get_ton_proof');
+      // Если сервер вернул отклик по auth (тип "auth" с code 0) → отправляем get_ton_proof
+      if (data.type === 'auth' && data.code === 0) {
+        console.log('Received auth success, sending get_ton_proof');
         socket.send(JSON.stringify({ type: 'get_ton_proof' }));
         return;
       }
