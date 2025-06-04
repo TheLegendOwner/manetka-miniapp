@@ -52,7 +52,14 @@ export default function WalletPage() {
   if (!ready || wallet === undefined || wallet === null) {
     return null;
   }
+  // Load Telegram avatar
+  useEffect(() => {
+    if (ready && user?.photo_url) {
+      setAvatar(user.photo_url);
+    }
+  }, [ready, user]);
 
+  if (!ready || !connected) return null;
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB] font-['Aboreto']">
       {/* Header */}
