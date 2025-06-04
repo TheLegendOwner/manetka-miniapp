@@ -13,8 +13,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Разбираем initData в пары ключ=значение
-    const kvPairs = initData.split("&").map((pair) => pair.split("="));
+    // Разбираем initData, декодируя ключи и значения
+    const kvPairs = initData.split("&").map((pair) => {
+      const [rawKey, rawValue] = pair.split("=");
+      const key = decodeURIComponent(rawKey);
+      const value = decodeURIComponent(rawValue || "");
+      return [key, value] as [string, string];
+    });
     const data: Record<string, string> = {};
     for (const [key, value] of kvPairs) {
       data[key] = value;
@@ -29,6 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Получаем секретный ключ: sha256(TELEGRAM_BOT_TOKEN)
     const botToken = process.env.TELEGRAM_BOT_TOKEN || "";
+    if (!botToken) {
+      console.error("TELEGRAM_BOT_TOKEN is not set");
+      return res.status(500).json({ ok: false, error: "Server misconfiguration" });
+    }
     const secretKey = crypto.createHash("sha256").update(botToken).digest();
 
     // Вычисляем hmac sha256
@@ -39,6 +48,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Сравниваем с полученным hash, защищённо по времени
     const receivedHash = data.hash;
+    if (!receivedHash) {
+      return res.status(403).json({ ok: false, error: "Missing hash" });
+    }
     const hmacBuffer = Buffer.from(hmac, "hex");
     const receivedBuffer = Buffer.from(receivedHash, "hex");
     if (
