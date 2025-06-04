@@ -40,7 +40,10 @@ export default function WalletPage() {
   const { t } = useTranslation();
   const { user, ready } = useTelegram();
   const wallet = useTonWallet();
-
+const avatarSrc =
+    user?.photo_url || `/icons/avatar${Math.floor(Math.random() * 11) + 1}.svg`;
+	
+	
   useEffect(() => {
     if (ready) {
       if (!user || wallet === null) {
@@ -52,14 +55,7 @@ export default function WalletPage() {
   if (!ready || wallet === undefined || wallet === null) {
     return null;
   }
-  // Load Telegram avatar
-  useEffect(() => {
-    if (ready && user?.photo_url) {
-      setAvatar(user.photo_url);
-    }
-  }, [ready, user]);
 
-  if (!ready || !connected) return null;
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB] font-['Aboreto']">
       {/* Header */}
@@ -72,7 +68,7 @@ export default function WalletPage() {
           onClick={() => router.push('/account')}
         >
           <Image
-            src={user?.photo_url || '/icons/avatar-default.svg'}
+            src={user?.photo_url || '/icons/avatar_default.svg'}
             alt="avatar"
             width={36}
             height={36}
