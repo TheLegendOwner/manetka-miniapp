@@ -29,16 +29,19 @@ function MainPage() {
   useEffect(() => {
     if (router.pathname !== '/') return;
     if (!hasRedirectedRef.current && (wallet as any)?.account?.address) {
-      console.log('Wallet already connected, redirecting to /wallet');
       hasRedirectedRef.current = true;
       router.replace('/wallet');
     }
   }, [wallet, router]);
 
+  // Если кошелëк уже подключён, не рендерим ничего (чтобы не триггерить useEffect снова)
+  if ((wallet as any)?.account?.address) {
+    return null;
+  }
+
   // Закрывает текущее соединение
   const closeSocket = () => {
     if (wsRef.current) {
-      console.log('Closing existing WebSocket, readyState =', wsRef.current.readyState);
       const old = wsRef.current;
       old.onopen = null;
       old.onmessage = null;
@@ -51,10 +54,8 @@ function MainPage() {
 
   // 2) Создание и работа с WebSocket при клике
   const handleConnectClick = useCallback(() => {
-    console.log('handleConnectClick invoked: ready=', ready);
     if (!ready) {
       setError('Telegram ещё не готов');
-      console.warn('Cannot connect: Telegram not ready');
       return;
     }
 
@@ -67,50 +68,40 @@ function MainPage() {
     closeSocket();
 
     // Создаём новый WebSocket
-    console.log('Creating new WebSocket to', WS_URL);
     const socket = new WebSocket(WS_URL);
     wsRef.current = socket;
 
     socket.onopen = () => {
-      console.log('WebSocket.onopen, readyState=', socket.readyState);
-
       // Отправляем auth
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
-      console.log('Sending auth:', { type: 'auth', initData });
       socket.send(JSON.stringify({ type: 'auth', initData }));
     };
 
     socket.onmessage = (event) => {
-      console.log('WebSocket.onmessage:', event.data);
       let data;
       try {
         data = JSON.parse(event.data);
-      } catch (err) {
-        console.error('Failed to parse WS message JSON:', err);
+      } catch {
         return;
       }
 
       // Если сервер подтвердил auth (type="auth", code=0) → отправляем get_ton_proof
       if (data.type === 'auth' && data.code === 0) {
-        console.log('Received auth success, sending get_ton_proof');
         socket.send(JSON.stringify({ type: 'get_ton_proof' }));
         return;
       }
 
       // Если сервер вернул Unauthorized → повторяем auth
       if (data.code === 1 && data.error?.includes('Unauthorized')) {
-        console.warn('Received Unauthorized, retrying auth');
         const tg = (window as any).Telegram?.WebApp;
         const initData = tg?.initData;
-        console.log('Re-sending auth:', { type: 'auth', initData });
         socket.send(JSON.stringify({ type: 'auth', initData }));
         return;
       }
 
       // Когда приходит challenge (ton_proof) → открываем TonConnect UI
       if (data.type === 'ton_proof' && data.value) {
-        console.log('Received ton_proof, opening TonConnect modal');
         tonConnectUI.setConnectRequestParameters({
           state: 'ready',
           value: { tonProof: data.value },
@@ -121,19 +112,17 @@ function MainPage() {
 
       // Если сервер вернул ошибку получения proof
       if (data.type === 'error_proof') {
-        console.error('Received error_proof:', data);
         setError(data.message || 'Ошибка получения tonProof');
         tonConnectUI.setConnectRequestParameters(null);
         setIsRequestingProof(false);
       }
     };
 
-    socket.onclose = (e) => {
-      console.warn('WebSocket.onclose:', e.code, e.reason);
+    socket.onclose = () => {
+      // Ничего делать не нужно
     };
 
-    socket.onerror = (err) => {
-      console.error('WebSocket.onerror:', err);
+    socket.onerror = () => {
       socket.close();
     };
   }, [ready, tonConnectUI]);
@@ -150,7 +139,7 @@ function MainPage() {
         </p>
       </div>
 
-      {!((wallet as any)?.account?.address) && delayedCheck && (
+      {!delayedCheck && !((wallet as any)?.account?.address) && (
         <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
           <button
             onClick={handleConnectClick}
