@@ -22,18 +22,20 @@ function MainPage() {
   // Хранит текущее WebSocket-соединение
   const wsRef = useRef<WebSocket | null>(null);
 
-  // 1) Редирект, если кошелёк уже подключён
+  // 1) Редирект, если кошелёк уже подключён и мы находимся именно на "/"
   useEffect(() => {
     if ((wallet as any)?.account?.address) {
-      console.log('Wallet already connected, redirecting to /wallet');
-      router.replace('/wallet');
+     if (router.pathname === '/') {
+        console.log('Wallet already connected, redirecting to /wallet');
+        router.replace('/wallet');
+     }
     } else if (!wallet) {
       const timer = setTimeout(() => setDelayedCheck(true), 500);
       return () => clearTimeout(timer);
     }
   }, [wallet, router]);
 
-  // Закрывает текущее соединение
+  // Остальной код без изменений…
   const closeSocket = () => {
     if (wsRef.current) {
       console.log('Closing existing WebSocket, readyState =', wsRef.current.readyState);
@@ -133,7 +135,7 @@ function MainPage() {
       console.error('WebSocket.onerror:', err);
       socket.close();
     };
-  }, [ready, tonConnectUI]);
+  }, [ready, tonConnectUI, router.pathname]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
