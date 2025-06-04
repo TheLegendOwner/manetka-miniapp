@@ -22,20 +22,20 @@ function MainPage() {
   // Хранит текущее WebSocket-соединение
   const wsRef = useRef<WebSocket | null>(null);
 
-  // 1) Редирект, если кошелёк уже подключён и мы находимся именно на "/"
+  // Реф для предотвращения повторного редиректа
+  const hasRedirectedRef = useRef(false);
+
+  // 1) Редирект на /wallet, но только если мы на "/" и ещё не редиректили
   useEffect(() => {
-    if ((wallet as any)?.account?.address) {
-     if (router.pathname === '/') {
-        console.log('Wallet already connected, redirecting to /wallet');
-        router.replace('/wallet');
-     }
-    } else if (!wallet) {
-      const timer = setTimeout(() => setDelayedCheck(true), 500);
-      return () => clearTimeout(timer);
+    if (router.pathname !== '/') return;
+    if (!hasRedirectedRef.current && (wallet as any)?.account?.address) {
+      console.log('Wallet already connected, redirecting to /wallet');
+      hasRedirectedRef.current = true;
+      router.replace('/wallet');
     }
   }, [wallet, router]);
 
-  // Остальной код без изменений…
+  // Закрывает текущее соединение
   const closeSocket = () => {
     if (wsRef.current) {
       console.log('Closing existing WebSocket, readyState =', wsRef.current.readyState);
@@ -49,6 +49,7 @@ function MainPage() {
     }
   };
 
+  // 2) Создание и работа с WebSocket при клике
   const handleConnectClick = useCallback(() => {
     console.log('handleConnectClick invoked: ready=', ready);
     if (!ready) {
@@ -62,10 +63,10 @@ function MainPage() {
 
     tonConnectUI.setConnectRequestParameters({ state: 'loading' });
 
-    // 1) Закрываем предыдущее соединение
+    // Закрываем прошлый сокет
     closeSocket();
 
-    // 2) Создаём новый WebSocket
+    // Создаём новый WebSocket
     console.log('Creating new WebSocket to', WS_URL);
     const socket = new WebSocket(WS_URL);
     wsRef.current = socket;
@@ -73,7 +74,7 @@ function MainPage() {
     socket.onopen = () => {
       console.log('WebSocket.onopen, readyState=', socket.readyState);
 
-      // 2.1) Отправляем auth
+      // Отправляем auth
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
       console.log('Sending auth:', { type: 'auth', initData });
@@ -90,14 +91,14 @@ function MainPage() {
         return;
       }
 
-      // Если сервер вернул отклик по auth (тип "auth" с code 0) → отправляем get_ton_proof
+      // Если сервер подтвердил auth (type="auth", code=0) → отправляем get_ton_proof
       if (data.type === 'auth' && data.code === 0) {
         console.log('Received auth success, sending get_ton_proof');
         socket.send(JSON.stringify({ type: 'get_ton_proof' }));
         return;
       }
 
-      // Если сервер вернул “Unauthorized” — повторяем auth
+      // Если сервер вернул Unauthorized → повторяем auth
       if (data.code === 1 && data.error?.includes('Unauthorized')) {
         console.warn('Received Unauthorized, retrying auth');
         const tg = (window as any).Telegram?.WebApp;
@@ -107,7 +108,7 @@ function MainPage() {
         return;
       }
 
-      // Когда приходит challenge (ton_proof) — отдаем его TonConnect UI
+      // Когда приходит challenge (ton_proof) → открываем TonConnect UI
       if (data.type === 'ton_proof' && data.value) {
         console.log('Received ton_proof, opening TonConnect modal');
         tonConnectUI.setConnectRequestParameters({
@@ -135,7 +136,7 @@ function MainPage() {
       console.error('WebSocket.onerror:', err);
       socket.close();
     };
-  }, [ready, tonConnectUI, router.pathname]);
+  }, [ready, tonConnectUI]);
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-white px-6 relative">
