@@ -10,8 +10,8 @@ import { useTelegram } from '../context/TelegramContext';
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL as string;
 
 function MainPage() {
-  const tonConnectUI = useTonConnectUI()[0];
-  const wallet = useTonWallet();
+const [tonConnectUI] = useTonConnectUI();
+const wallet = useTonWallet();
   const router = useRouter();
   const { ready } = useTelegram();
 
