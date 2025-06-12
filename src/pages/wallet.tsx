@@ -2,14 +2,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import {
-  useTonConnectUI,
-  useTonWallet,
-  useTonAddress,
-  useIsConnectionRestored
-} from '@tonconnect/ui-react';
+import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
 import { useTranslation } from 'react-i18next';
 import { useTelegram } from '../context/TelegramContext';
 import { useAuth } from '../context/AuthContext';
@@ -30,14 +25,18 @@ interface WalletInfo {
 
 interface BalancesResponse {
   code: number;
-  data: { balances: Array<{ token: string; sums: Record<'balance'|'usd'|'ton', number> }> };
+  data: { balances: Array<{ token: string; sums: Record<'balance' | 'usd' | 'ton', number> }> };
 }
+
 interface RewardsResponse {
   code: number;
   data: { rewards: Array<{ token: string; amount: number }> };
 }
 
-export default dynamic(() => Promise.resolve(WalletPage), { ssr: false });
+interface ProofPayloadResponse {
+  code: number;
+  data: { payload: string; timestamp: number };
+}
 
 function WalletPage() {
   const router = useRouter();
@@ -58,14 +57,14 @@ function WalletPage() {
   }>>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1) Redirect if no JWT
+  // Redirect to "/" if not authenticated
   useEffect(() => {
     if (!authLoading && !token) {
       router.replace('/');
     }
   }, [authLoading, token, router]);
 
-  // 2) Fetch wallets, balances, rewards
+  // Fetch wallets, balances and rewards
   const fetchWalletsAndData = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -73,11 +72,10 @@ function WalletPage() {
       const wRes = await fetch('/api/wallets', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const json = await wRes.json();
-      const list: WalletInfo[] = json.data.wallets;
+      const { data: { wallets: list } } = await wRes.json();
 
-      // If no wallets on server, send back to index to connect
-      if (list.length === 0) {
+      // If no wallets, redirect to index to connect
+      if (!list || list.length === 0) {
         router.replace('/');
         return;
       }
@@ -116,7 +114,14 @@ function WalletPage() {
     }
   }, [token, router]);
 
-  // 3) Initial proof → verify flow
+  // Ensure redirect if, after loading, still no wallets
+  useEffect(() => {
+    if (!loading && token && wallets.length === 0) {
+      router.replace('/');
+    }
+  }, [loading, token, wallets, router]);
+
+  // Initial proof→verify flow
   useEffect(() => {
     const verify = async () => {
       if (!token || !tonConnectUI.account?.address) return;
@@ -124,60 +129,69 @@ function WalletPage() {
         const ppRes = await fetch('/api/proof-payload', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        const { data: { payload, timestamp } } = await ppRes.json();
+        const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
+
         const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
+
         await fetch('/api/verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({ account: tonConnectUI.account, proof })
+          body: JSON.stringify({
+            account: tonConnectUI.account,
+            proof
+          })
         });
+
         await fetchWalletsAndData();
       } catch (err) {
-        console.error('Initial verify failed', err);
+        console.error('Initial wallet verification failed', err);
       }
     };
     verify();
   }, [token, tonConnectUI, fetchWalletsAndData]);
 
-  // 4) Load data when token & address exist
+  // Load data when token & address available
   useEffect(() => {
     if (token && tonAddress) {
       fetchWalletsAndData();
     }
   }, [token, tonAddress, fetchWalletsAndData]);
 
-  // 5) New-wallet handler
+  // Handle new wallet connections
   useEffect(() => {
     if (!token) return;
-    const unsub = tonConnectUI.onStatusChange(async w => {
-      if (w?.account?.address) {
+    const unsub = tonConnectUI.onStatusChange(async wallet => {
+      if (wallet?.account?.address) {
         try {
           const ppRes = await fetch('/api/proof-payload', {
             headers: { Authorization: `Bearer ${token}` }
           });
-          const { data: { payload, timestamp } } = await ppRes.json();
+          const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
+
           const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
+
           await fetch('/api/verify', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`
             },
-            body: JSON.stringify({ account: w.account, proof })
+            body: JSON.stringify({ account: wallet.account, proof })
           });
+
           await fetchWalletsAndData();
         } catch (err) {
-          console.error('New wallet verify failed', err);
+          console.error('New wallet verification failed', err);
         }
       }
     });
     return () => unsub();
   }, [tonConnectUI, token, fetchWalletsAndData]);
 
-  // 6) Set main wallet
+  // Set main wallet
   const handleSetMain = async (walletId: number) => {
     if (!token) return;
     try {
@@ -191,10 +205,11 @@ function WalletPage() {
     }
   };
 
-  // 7) Render logic
   if (authLoading || loading) {
     return <p className="p-4 text-center">Loading…</p>;
   }
+
+  // Show connect button if wallet not yet linked
   if (!tonAddress) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-white px-6">
@@ -210,7 +225,7 @@ function WalletPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB]">
-      {/* Header */}
+      {/* Header with wallet selector */}
       <div className="flex justify-between items-center px-5 py-4 border-b bg-white">
         <h1 className="text-lg font-semibold uppercase">{t('token_assets')}</h1>
         <div className="flex space-x-2">
@@ -273,3 +288,5 @@ function WalletPage() {
     </div>
   );
 }
+
+export default dynamic(() => Promise.resolve(WalletPage), { ssr: false });
