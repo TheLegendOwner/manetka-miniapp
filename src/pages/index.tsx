@@ -16,7 +16,7 @@ function MainPage() {
   const [hasWallets, setHasWallets] = useState<boolean | null>(null);
   const [verified, setVerified] = useState(false);
 
-  // 1) After auth, fetch existing wallets once
+  // 1) After auth, load /api/wallets once
   useEffect(() => {
     if (!authLoading && token) {
       fetch('/api/wallets', {
@@ -31,24 +31,24 @@ function MainPage() {
     }
   }, [authLoading, token]);
 
-  // 2) Redirect to /wallet if wallets exist or just verified
+  // 2) Redirect to /wallet if we already have wallets or just verified
   useEffect(() => {
     if (!authLoading && token && (hasWallets === true || verified)) {
       router.replace('/wallet');
     }
   }, [authLoading, token, hasWallets, verified, router]);
 
-  // 3) Delay connect button
+  // 3) Delay showing the connect button to avoid flicker
   useEffect(() => {
     const timer = setTimeout(() => setDelayedCheck(true), 500);
     return () => clearTimeout(timer);
   }, []);
 
-  // 4) Connect & verify flow
+  // 4) Connect & verify flow using requestProof directly
   const connectTonWallet = useCallback(async () => {
     if (!token) return;
     try {
-      // fetch proof-payload
+      // fetch proof-payload from server
       const ppRes = await fetch('/api/proof-payload', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -56,19 +56,10 @@ function MainPage() {
         data: { payload, timestamp }
       } = (await ppRes.json()) as { data: { payload: string; timestamp: number } };
 
-      // hand off to UI
+      // hand off to TonConnect UI
       ;(tonConnectUI as any).setConnectRequestParameters({ payload, timestamp });
-      tonConnectUI.openModal();
-
-      // wait for proof
-      const proof = await new Promise<any>(resolve => {
-        const unsub = tonConnectUI.onStatusChange(state => {
-          if (state?.connectItems?.tonProof) {
-            unsub();
-            resolve(state.connectItems.tonProof);
-          }
-        });
-      });
+      // requestProof opens modal and returns the signed proof
+      const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
 
       // verify on backend
       await fetch('/api/verify', {
