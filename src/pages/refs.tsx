@@ -23,7 +23,7 @@ interface Referral {
   first_name: string;
   last_name: string;
   username: string;
-  rewards: string;
+  rewards: string; // e.g. "1.23 TON"
 }
 
 export default function RefsPage() {
@@ -36,33 +36,56 @@ export default function RefsPage() {
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [referralLink, setReferralLink] = useState('');
 
+  // Redirect if not authenticated or wallet not connected
   useEffect(() => {
     if (tgReady && (!token || !tonAddress)) {
       router.replace('/');
     }
   }, [tgReady, token, tonAddress, router]);
 
+  // Build referral link and fetch real referrals from API
   useEffect(() => {
-    if (tgReady && user) {
+    if (tgReady && token && tonAddress && user) {
       setReferralLink(`https://t.me/manetka_bot/app?startapp=ref${user.id}`);
-      // TODO: replace with real fetch('/api/referrals/${user.id}')
-      setReferrals([
-        { first_name: 'Alex', last_name: 'Ivanov', username: 'alexivanov', rewards: '1.23 TON' },
-        { first_name: 'Maria', last_name: 'Petrova', username: 'mariap',    rewards: '0.85 TON' },
-        { first_name: 'John',  last_name: 'Smith',   username: 'johnsmith', rewards: '0.36 TON' }
-      ]);
+
+      (async () => {
+        try {
+          const res = await fetch('/api/referrals', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const json = await res.json();
+          // assume API returns { data: { referrals: Referral[] } }
+          const list: Referral[] = json.data.referrals;
+          setReferrals(list);
+        } catch (err) {
+          console.error('Failed to fetch referrals', err);
+        }
+      })();
     }
-  }, [tgReady, user]);
+  }, [tgReady, token, tonAddress, user]);
 
   if (authLoading || !user || !tonAddress) {
     return null;
   }
 
-  const copyReferral = () => navigator.clipboard.writeText(referralLink);
-  const shareReferral = () =>
-    navigator.share
-      ? navigator.share({ title: 'Manetka', text: `${t('join_manetka')}: ${referralLink}`, url: referralLink })
-      : alert(t('share_not_supported'));
+  const copyReferral = () => {
+    navigator.clipboard.writeText(referralLink);
+  };
+  const shareReferral = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: 'Manetka',
+        text: `${t('join_manetka')}: ${referralLink}`,
+        url: referralLink
+      });
+    } else {
+      alert(t('share_not_supported'));
+    }
+  };
+
+  const totalRewards = referrals
+    .reduce((sum, r) => sum + parseFloat(r.rewards), 0)
+    .toFixed(2);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB] font-['Aboreto']">
@@ -85,7 +108,7 @@ export default function RefsPage() {
           </div>
           <div className="flex justify-between text-sm font-medium">
             <span>{t('referral_share')}</span>
-            <span>{referrals.reduce((sum, r) => sum + parseFloat(r.rewards), 0).toFixed(2)} TON</span>
+            <span>{totalRewards} TON</span>
           </div>
           <div className="text-xs text-gray-500">{t('your_referral_link')}</div>
           <div className="flex items-center gap-2 mt-1">
@@ -119,7 +142,10 @@ export default function RefsPage() {
 
       {/* Bottom nav */}
       <div className="fixed bottom-0 inset-x-0 border-t bg-white py-2 px-4 flex justify-between">
-        <button onClick={() => router.push('/wallet')} className="w-1/5 flex flex-col items-center text-gray-500 hover:text-yellow-600">
+        <button
+          onClick={() => router.push('/wallet')}
+          className="w-1/5 flex flex-col items-center text-gray-500 hover:text-yellow-600"
+        >
           <Wallet size={24} className="mb-1" />
           <span className="text-xs">{t('wallet')}</span>
         </button>
@@ -131,11 +157,17 @@ export default function RefsPage() {
           <ImageIcon size={24} className="mb-1 opacity-50" />
           <span className="text-xs">{t('nfts')}</span>
         </div>
-        <button onClick={() => router.push('/social')} className="w-1/5 flex flex-col items-center text-gray-500 hover:text-yellow-600">
+        <button
+          onClick={() => router.push('/social')}
+          className="w-1/5 flex flex-col items-center text-gray-500 hover:text-yellow-600"
+        >
           <Share2 size={24} className="mb-1" />
           <span className="text-xs">{t('social')}</span>
         </button>
-        <button onClick={() => router.push('/refs')} className="w-1/5 flex flex-col items-center text-[#EBB923] hover:text-yellow-600">
+        <button
+          onClick={() => router.push('/refs')}
+          className="w-1/5 flex flex-col items-center text-[#EBB923] hover:text-yellow-600"
+        >
           <Users size={24} className="mb-1" />
           <span className="text-xs">{t('refs')}</span>
         </button>
