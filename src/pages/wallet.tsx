@@ -1,9 +1,15 @@
 // src/pages/wallet.tsx
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
+import {
+  useTonConnectUI,
+  useTonWallet,
+  useTonAddress,
+  useIsConnectionRestored
+} from '@tonconnect/ui-react';
 import { useTranslation } from 'react-i18next';
 import { useTelegram } from '../context/TelegramContext';
 import { useAuth } from '../context/AuthContext';
@@ -24,18 +30,16 @@ interface WalletInfo {
 
 interface BalancesResponse {
   code: number;
-  data: { balances: Array<{ token: string; sums: Record<'balance' | 'usd' | 'ton', number> }> };
+  data: { balances: Array<{ token: string; sums: Record<'balance'|'usd'|'ton', number> }> };
 }
 interface RewardsResponse {
   code: number;
   data: { rewards: Array<{ token: string; amount: number }> };
 }
-interface ProofPayloadResponse {
-  code: number;
-  data: { payload: string; timestamp: number };
-}
 
-export default function WalletPage() {
+export default dynamic(() => Promise.resolve(WalletPage), { ssr: false });
+
+function WalletPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const { token, loading: authLoading } = useAuth();
@@ -45,12 +49,23 @@ export default function WalletPage() {
 
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [mainWalletId, setMainWalletId] = useState<number | null>(null);
-  const [tokens, setTokens] = useState<
-    Array<{ token: string; balance: string; usd: string; ton: string; rewards: string }>
-  >([]);
+  const [tokens, setTokens] = useState<Array<{
+    token: string;
+    balance: string;
+    usd: string;
+    ton: string;
+    rewards: string;
+  }>>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch wallets, balances and rewards
+  // 1) Redirect if no JWT
+  useEffect(() => {
+    if (!authLoading && !token) {
+      router.replace('/');
+    }
+  }, [authLoading, token, router]);
+
+  // 2) Fetch wallets, balances, rewards
   const fetchWalletsAndData = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -58,7 +73,15 @@ export default function WalletPage() {
       const wRes = await fetch('/api/wallets', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const { data: { wallets: list } } = await wRes.json();
+      const json = await wRes.json();
+      const list: WalletInfo[] = json.data.wallets;
+
+      // If no wallets on server, send back to index to connect
+      if (list.length === 0) {
+        router.replace('/');
+        return;
+      }
+
       setWallets(list);
       const main = list[0];
       setMainWalletId(main.wallet_id);
@@ -91,90 +114,70 @@ export default function WalletPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, router]);
 
-  // Redirect if no JWT
+  // 3) Initial proof → verify flow
   useEffect(() => {
-    if (!authLoading && !token) {
-      router.replace('/');
-    }
-  }, [authLoading, token, router]);
-
-  // Initial server-side proof → verify
-  useEffect(() => {
-    const verifyWallet = async () => {
+    const verify = async () => {
       if (!token || !tonConnectUI.account?.address) return;
       try {
-        // 1) Get payload
         const ppRes = await fetch('/api/proof-payload', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
-
-        // 2) Request signature
+        const { data: { payload, timestamp } } = await ppRes.json();
         const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
-
-        // 3) Send proof to server
         await fetch('/api/verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({
-            account: tonConnectUI.account,
-            proof
-          })
+          body: JSON.stringify({ account: tonConnectUI.account, proof })
         });
-
-        // 4) Load data
         await fetchWalletsAndData();
       } catch (err) {
-        console.error('Initial wallet verification failed', err);
+        console.error('Initial verify failed', err);
       }
     };
-    verifyWallet();
+    verify();
   }, [token, tonConnectUI, fetchWalletsAndData]);
 
-  // Load data when token & address available
+  // 4) Load data when token & address exist
   useEffect(() => {
     if (token && tonAddress) {
       fetchWalletsAndData();
     }
   }, [token, tonAddress, fetchWalletsAndData]);
 
-  // Verify any new wallets added
+  // 5) New-wallet handler
   useEffect(() => {
     if (!token) return;
-    const unsub = tonConnectUI.onStatusChange(async wallet => {
-      if (wallet?.account?.address) {
+    const unsub = tonConnectUI.onStatusChange(async w => {
+      if (w?.account?.address) {
         try {
           const ppRes = await fetch('/api/proof-payload', {
             headers: { Authorization: `Bearer ${token}` }
           });
-          const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
-
+          const { data: { payload, timestamp } } = await ppRes.json();
           const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
-
           await fetch('/api/verify', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`
             },
-            body: JSON.stringify({ account: wallet.account, proof })
+            body: JSON.stringify({ account: w.account, proof })
           });
-
           await fetchWalletsAndData();
         } catch (err) {
-          console.error('New wallet verification failed', err);
+          console.error('New wallet verify failed', err);
         }
       }
     });
     return () => unsub();
   }, [tonConnectUI, token, fetchWalletsAndData]);
 
-  // Set main wallet
+  // 6) Set main wallet
   const handleSetMain = async (walletId: number) => {
     if (!token) return;
     try {
@@ -188,11 +191,10 @@ export default function WalletPage() {
     }
   };
 
+  // 7) Render logic
   if (authLoading || loading) {
     return <p className="p-4 text-center">Loading…</p>;
   }
-
-  // If no TON wallet connected yet
   if (!tonAddress) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-white px-6">
@@ -206,10 +208,9 @@ export default function WalletPage() {
     );
   }
 
-  // Main UI
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB]">
-      {/* Header with wallet selector */}
+      {/* Header */}
       <div className="flex justify-between items-center px-5 py-4 border-b bg-white">
         <h1 className="text-lg font-semibold uppercase">{t('token_assets')}</h1>
         <div className="flex space-x-2">
@@ -253,10 +254,7 @@ export default function WalletPage() {
       </div>
       {/* Bottom Nav */}
       <div className="fixed bottom-0 inset-x-0 border-t bg-white py-2 px-4 flex justify-between">
-        <button
-          onClick={() => router.push('/wallet')}
-          className="w-1/5 flex flex-col items-center text-[#EBB923]"
-        >
+        <button onClick={() => router.push('/wallet')} className="w-1/5 flex flex-col items-center text-[#EBB923]">
           <WalletIcon size={24} /><span className="text-xs">{t('wallet')}</span>
         </button>
         <div className="w-1/5 flex flex-col items-center text-gray-300 cursor-not-allowed">
@@ -265,16 +263,10 @@ export default function WalletPage() {
         <div className="w-1/5 flex flex-col items-center text-gray-300 cursor-not-allowed">
           <ImageIcon size={24} /><span className="text-xs">{t('nfts')}</span>
         </div>
-        <button
-          onClick={() => router.push('/social')}
-          className="w-1/5 flex flex-col items-center text-gray-500"
-        >
+        <button onClick={() => router.push('/social')} className="w-1/5 flex flex-col items-center text-gray-500">
           <Share2 size={24} /><span className="text-xs">{t('social')}</span>
         </button>
-        <button
-          onClick={() => router.push('/refs')}
-          className="w-1/5 flex flex-col items-center text-gray-500"
-        >
+        <button onClick={() => router.push('/refs')} className="w-1/5 flex flex-col	items-center text-gray-500">
           <Users size={24} /><span className="text-xs">{t('refs')}</span>
         </button>
       </div>
