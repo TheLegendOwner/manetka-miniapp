@@ -1,4 +1,4 @@
-// src/pages/wallet.tsx
+// src/pages/wallet.tsx (full updated code)
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -17,7 +17,7 @@ import {
 
 interface BalancesResponse {
   code: number;
-  data: { balances: Array<{ token: string; sums: Record<'balance'|'usd'|'ton', number> }> };
+  data: { balances: Array<{ token: string; sums: Record<'balance' | 'usd' | 'ton', number> }> };
 }
 interface RewardsResponse {
   code: number;
@@ -44,7 +44,32 @@ export default function WalletPage() {
   }>>([]);
   const [loading, setLoading] = useState(true);
 
-  // Step 2: fetch wallets list and redirect if none
+  const connectTonWallet = useCallback(async () => {
+    if (!token) return;
+    try {
+      const ppRes = await fetch('/api/proof-payload', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
+
+      const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
+
+      await fetch('/api/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ account: tonConnectUI.account, proof })
+      });
+
+      // After successful verify, reload wallets & balances
+      await fetchWalletsAndData();
+    } catch (err) {
+      console.error('Connect wallet failed', err);
+    }
+  }, [token, tonConnectUI]);
+
   const fetchWalletsAndData = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -53,13 +78,18 @@ export default function WalletPage() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const { data: { wallets } } = await wRes.json();
-      if (!wallets || wallets.length === 0) {
-        router.replace('/');
+
+      if (wallets.length === 0) {
+        // First time: server has no wallets, but user may have connected TON address
+        // Prompt connect flow
+        await connectTonWallet();
         return;
       }
-      // accumulate across all wallets
+
+      // Aggregate balances and rewards across all wallets
       const balMap = new Map<string, { balance: number; usd: number; ton: number }>();
       const rewMap = new Map<string, number>();
+
       for (const w of wallets) {
         const [bRes, rRes] = await Promise.all([
           fetch(`/api/balances/${w.wallet_id}`, {
@@ -71,24 +101,26 @@ export default function WalletPage() {
         ]);
         const { data: { balances } }: BalancesResponse = await bRes.json();
         const { data: { rewards } }: RewardsResponse = await rRes.json();
+
         balances.forEach(b => {
           const prev = balMap.get(b.token) ?? { balance: 0, usd: 0, ton: 0 };
           balMap.set(b.token, {
             balance: prev.balance + b.sums.balance,
-            usd:     prev.usd     + b.sums.usd,
-            ton:     prev.ton     + b.sums.ton
+            usd: prev.usd + b.sums.usd,
+            ton: prev.ton + b.sums.ton
           });
         });
         rewards.forEach(r => {
           rewMap.set(r.token, (rewMap.get(r.token) ?? 0) + r.amount);
         });
       }
+
       setTokens(
         Array.from(balMap.entries()).map(([token, sums]) => ({
           token,
           balance: sums.balance,
-          usd:     sums.usd,
-          ton:     sums.ton,
+          usd: sums.usd,
+          ton: sums.ton,
           rewards: rewMap.get(token) ?? 0
         }))
       );
@@ -97,57 +129,24 @@ export default function WalletPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, router]);
+  }, [token, connectTonWallet]);
 
-  // Step 1: ensure auth
   useEffect(() => {
     if (!authLoading && !token) {
       router.replace('/');
     }
   }, [authLoading, token, router]);
 
-  // Step 7: load data when address connected
   useEffect(() => {
     if (token && tonAddress) {
       fetchWalletsAndData();
     }
   }, [token, tonAddress, fetchWalletsAndData]);
 
-  // Step 3–6: connect TON wallet
-  const connectTonWallet = useCallback(async () => {
-    if (!token) return;
-    try {
-      // 4) get payload
-      const ppRes = await fetch('/api/proof-payload', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
-      // 5) open modal and request proof
-      const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
-      // 6) verify
-      await fetch('/api/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          account: tonConnectUI.account,
-          proof
-        })
-      });
-      // reload balances
-      await fetchWalletsAndData();
-    } catch (err) {
-      console.error('Connect wallet failed', err);
-    }
-  }, [token, tonConnectUI, fetchWalletsAndData]);
-
   if (authLoading || loading) {
     return <p className="p-4 text-center">Loading…</p>;
   }
 
-  // Step 3: show connect button if not linked
   if (!tonAddress) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-white px-6">
@@ -161,7 +160,6 @@ export default function WalletPage() {
     );
   }
 
-  // Step 7: render summed balances & rewards
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB]">
       {/* Header */}
@@ -177,10 +175,18 @@ export default function WalletPage() {
           >
             <div>
               <p className="font-bold text-lg">{tok.token}</p>
-              <p className="text-sm text-gray-500">{t('balance')}: {tok.balance.toFixed(4)}</p>
-              <p className="text-sm text-gray-500">{t('balance_usd')}: ${tok.usd.toFixed(2)}</p>
-              <p className="text-sm text-gray-500">{t('balance_ton')}: {tok.ton.toFixed(4)} TON</p>
-              <p className="text-sm text-green-600 font-semibold">{t('rewards')}: {tok.rewards.toFixed(4)} TON</p>
+              <p className="text-sm text-gray-500">
+                {t('balance')}: {tok.balance.toFixed(4)}
+              </p>
+              <p className="text-sm text-gray-500">
+                {t('balance_usd')}: ${tok.usd.toFixed(2)}
+              </p>
+              <p className="text-sm text-gray-500">
+                {t('balance_ton')}: {tok.ton.toFixed(4)} TON
+              </p>
+              <p className="text-sm text-green-600 font-semibold">
+                {t('rewards')}: {tok.rewards.toFixed(4)} TON
+              </p>
             </div>
             <Image
               src={`/token-${tok.token.toLowerCase()}.png`}
@@ -193,20 +199,34 @@ export default function WalletPage() {
       </div>
       {/* Bottom Nav */}
       <div className="fixed bottom-0 inset-x-0 border-t bg-white py-2 px-4 flex justify-between">
-        <button onClick={() => router.push('/wallet')} className="w-1/5 flex flex-col items-center text-[#EBB923]">
-          <WalletIcon size={24} /><span className="text-xs">{t('wallet')}</span>
+        <button
+          onClick={() => router.push('/wallet')}
+          className="w-1/5 flex flex-col items-center text-[#EBB923]"
+        >
+          <WalletIcon size={24} />
+          <span className="text-xs">{t('wallet')}</span>
         </button>
         <div className="w-1/5 flex flex-col items-center text-gray-300 cursor-not-allowed">
-          <Gamepad2 size={24} /><span className="text-xs">{t('games')}</span>
+          <Gamepad2 size={24} />
+          <span className="text-xs">{t('games')}</span>
         </div>
         <div className="w-1/5 flex flex-col items-center text-gray-300 cursor-not-allowed">
-          <ImageIcon size={24} /><span className="text-xs">{t('nfts')}</span>
+          <ImageIcon size={24} />
+          <span className="text-xs">{t('nfts')}</span>
         </div>
-        <button onClick={() => router.push('/social')} className="w-1/5 flex flex-col items-center text-gray-500">
-          <Share2 size={24} /><span className="text-xs">{t('social')}</span>
+        <button
+          onClick={() => router.push('/social')}
+          className="w-1/5 flex flex-col items-center text-gray-500"
+        >
+          <Share2 size={24} />
+          <span className="text-xs">{t('social')}</span>
         </button>
-        <button onClick={() => router.push('/refs')} className="w-1/5 flex flex-col items-center text-gray-500">
-          <Users size={24} /><span className="text-xs">{t('refs')}</span>
+        <button
+          onClick={() => router.push('/refs')}
+          className="w-1/5 flex flex-col	items-center text-gray-500"
+        >
+          <Users size={24} />
+          <span className="text-xs">{t('refs')}</span>
         </button>
       </div>
     </div>
