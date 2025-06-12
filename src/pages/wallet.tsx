@@ -15,7 +15,6 @@ import {
   Users,
   Share2
 } from 'lucide-react';
-import { API_BASE } from '../config/api';
 
 interface WalletInfo {
   wallet_id: number;
@@ -61,7 +60,7 @@ export default function WalletPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const wRes = await fetch(`/api/wallets`, {
+      const wRes = await fetch('/api/wallets', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const { data: { wallets: list } } = await wRes.json();
@@ -70,12 +69,8 @@ export default function WalletPage() {
       setMainWalletId(main.wallet_id);
 
       const [bRes, rRes] = await Promise.all([
-        fetch(`/api/balances/${main.wallet_id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        fetch(`/api/rewards/${main.wallet_id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        fetch(`/api/balances/${main.wallet_id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`/api/rewards/${main.wallet_id}`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       const { data: { balances } }: BalancesResponse = await bRes.json();
@@ -100,26 +95,19 @@ export default function WalletPage() {
     }
   }, [token]);
 
-  useEffect(() => {
-    if (!authLoading) {
-      if (!token) router.replace('/');
-      else if (!tonAddress) router.replace('/');
-    }
-  }, [authLoading, token, tonAddress, router]);
-
-  // Initial server-side verification (first load)
+  // Initial server-side proof & verify
   useEffect(() => {
     const verifyWallet = async () => {
       if (!token || !tonConnectUI.account?.address) return;
       try {
-        const ppRes = await fetch(`/api/proof-payload`, {
+        const ppRes = await fetch('/api/proof-payload', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
 
         const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
 
-        await fetch(`/api/verify`, {
+        await fetch('/api/verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -136,31 +124,30 @@ export default function WalletPage() {
         console.error('Initial wallet verification failed', err);
       }
     };
-
     verifyWallet();
   }, [token, tonConnectUI, fetchWalletsAndData]);
 
-  // Load data whenever token & address exist
+  // Load data when token & address available
   useEffect(() => {
     if (token && tonAddress) {
       fetchWalletsAndData();
     }
   }, [token, tonAddress, fetchWalletsAndData]);
 
-  // Verify newly added wallets
+  // Verify any new wallets added
   useEffect(() => {
     if (!token) return;
     const unsub = tonConnectUI.onStatusChange(async wallet => {
       if (wallet?.account?.address) {
         try {
-          const ppRes = await fetch(`/api/proof-payload`, {
+          const ppRes = await fetch('/api/proof-payload', {
             headers: { Authorization: `Bearer ${token}` }
           });
           const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
 
           const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
 
-          await fetch(`/api/verify`, {
+          await fetch('/api/verify', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -181,6 +168,7 @@ export default function WalletPage() {
     return () => unsub();
   }, [tonConnectUI, token, fetchWalletsAndData]);
 
+  // Set main wallet
   const handleSetMain = async (walletId: number) => {
     if (!token) return;
     try {
@@ -198,9 +186,23 @@ export default function WalletPage() {
     return <p className="p-4 text-center">Loading…</p>;
   }
 
+  // If no TON wallet connected yet
+  if (!tonAddress) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-white px-6">
+        <button
+          onClick={() => tonConnectUI.openModal()}
+          className="w-[300px] h-[50px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold rounded-full"
+        >
+          {t('connect')}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB]">
-      {/* Header with selector */}
+      {/* Header with wallet selector */}
       <div className="flex justify-between items-center px-5 py-4 border-b bg-white">
         <h1 className="text-lg font-semibold uppercase">{t('token_assets')}</h1>
         <div className="flex space-x-2">
@@ -244,7 +246,7 @@ export default function WalletPage() {
         ))}
       </div>
 
-      {/* Bottom nav */}
+      {/* Bottom Nav */}
       <div className="fixed bottom-0 inset-x-0 border-t bg-white py-2 px-4 flex justify-between">
         <button onClick={() => router.push('/wallet')} className="w-1/5 flex flex-col items-center text-[#EBB923]">
           <WalletIcon size={24} /><span className="text-xs">{t('wallet')}</span>
