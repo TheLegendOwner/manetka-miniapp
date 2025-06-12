@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     const initData = (window as any).Telegram.WebApp.initData;
-    fetch(`${API_BASE}/auth`, {
+    fetch(`/auth`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ initData })
