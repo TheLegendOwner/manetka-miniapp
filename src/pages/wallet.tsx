@@ -61,7 +61,7 @@ export default function WalletPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const wRes = await fetch(`${API_BASE}/api/wallets`, {
+      const wRes = await fetch(`/api/wallets`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const { data: { wallets: list } } = await wRes.json();
@@ -70,10 +70,10 @@ export default function WalletPage() {
       setMainWalletId(main.wallet_id);
 
       const [bRes, rRes] = await Promise.all([
-        fetch(`${API_BASE}/api/balances/${main.wallet_id}`, {
+        fetch(`/api/balances/${main.wallet_id}`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        fetch(`${API_BASE}/api/rewards/${main.wallet_id}`, {
+        fetch(`/api/rewards/${main.wallet_id}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
@@ -112,14 +112,14 @@ export default function WalletPage() {
     const verifyWallet = async () => {
       if (!token || !tonConnectUI.account?.address) return;
       try {
-        const ppRes = await fetch(`${API_BASE}/api/proof-payload`, {
+        const ppRes = await fetch(`/api/proof-payload`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
 
         const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
 
-        await fetch(`${API_BASE}/api/verify`, {
+        await fetch(`/api/verify`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -153,14 +153,14 @@ export default function WalletPage() {
     const unsub = tonConnectUI.onStatusChange(async wallet => {
       if (wallet?.account?.address) {
         try {
-          const ppRes = await fetch(`${API_BASE}/api/proof-payload`, {
+          const ppRes = await fetch(`/api/proof-payload`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
 
           const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
 
-          await fetch(`${API_BASE}/api/verify`, {
+          await fetch(`/api/verify`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -184,7 +184,7 @@ export default function WalletPage() {
   const handleSetMain = async (walletId: number) => {
     if (!token) return;
     try {
-      await fetch(`${API_BASE}/api/wallets/${walletId}/set_main`, {
+      await fetch(`/api/wallets/${walletId}/set_main`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
