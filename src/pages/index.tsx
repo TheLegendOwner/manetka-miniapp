@@ -3,47 +3,93 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useState, useCallback } from 'react';
-import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
+import { useTonConnectUI } from '@tonconnect/ui-react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import '../lib/i18n';
 
 function MainPage() {
   const [tonConnectUI] = useTonConnectUI();
-  const address = useTonAddress();
   const router = useRouter();
-  const [delayedCheck, setDelayedCheck] = useState(false);
-
   const { token, loading: authLoading } = useAuth();
+  const [delayedCheck, setDelayedCheck] = useState(false);
+  const [hasWallets, setHasWallets] = useState<boolean | null>(null);
+  const [verified, setVerified] = useState(false);
 
-  // Redirect to /wallet when both token and TON address are available
+  // 1) After auth, fetch existing wallets once
   useEffect(() => {
-    if (!authLoading && token && address) {
-      router.replace('/wallet');
-    } else {
-      const timer = setTimeout(() => setDelayedCheck(true), 500);
-      return () => clearTimeout(timer);
+    if (!authLoading && token) {
+      fetch('/api/wallets', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(r => r.json())
+        .then(json => {
+          const list = json.data.wallets as any[];
+          setHasWallets(list.length > 0);
+        })
+        .catch(() => setHasWallets(false));
     }
-  }, [authLoading, token, address, router]);
+  }, [authLoading, token]);
 
-  // Handler to fetch proof-payload and open TonConnect modal
+  // 2) Redirect to /wallet if wallets exist or just verified
+  useEffect(() => {
+    if (!authLoading && token && (hasWallets === true || verified)) {
+      router.replace('/wallet');
+    }
+  }, [authLoading, token, hasWallets, verified, router]);
+
+  // 3) Delay connect button
+  useEffect(() => {
+    const timer = setTimeout(() => setDelayedCheck(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 4) Connect & verify flow
   const connectTonWallet = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch('/api/proof-payload', {
+      // fetch proof-payload
+      const ppRes = await fetch('/api/proof-payload', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const { data: { payload, timestamp } } = await res.json();
-      // Provide payload and timestamp to TonConnect UI
+      const {
+        data: { payload, timestamp }
+      } = (await ppRes.json()) as { data: { payload: string; timestamp: number } };
+
+      // hand off to UI
       ;(tonConnectUI as any).setConnectRequestParameters({ payload, timestamp });
-      // Open the modal to let the user connect/sign
       tonConnectUI.openModal();
+
+      // wait for proof
+      const proof = await new Promise<any>(resolve => {
+        const unsub = tonConnectUI.onStatusChange(state => {
+          if (state?.connectItems?.tonProof) {
+            unsub();
+            resolve(state.connectItems.tonProof);
+          }
+        });
+      });
+
+      // verify on backend
+      await fetch('/api/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          account: tonConnectUI.account,
+          proof
+        })
+      });
+
+      setVerified(true);
     } catch (err) {
-      console.error('Failed to get proof-payload', err);
+      console.error('Connection or verification failed', err);
     }
   }, [token, tonConnectUI]);
 
-  if (authLoading) {
+  if (authLoading || hasWallets === null) {
     return <p className="p-4 text-center">Loading authentication…</p>;
   }
 
@@ -59,7 +105,7 @@ function MainPage() {
         </p>
       </div>
 
-      {!address && delayedCheck && (
+      {hasWallets === false && delayedCheck && (
         <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
           <button
             onClick={connectTonWallet}
