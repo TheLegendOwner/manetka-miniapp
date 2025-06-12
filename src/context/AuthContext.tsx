@@ -1,21 +1,19 @@
+// src/context/AuthContext.tsx
 'use client';
+
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useTelegram } from './TelegramContext';
+import { API_BASE } from '../config/api';
 
-interface AuthUser {
-  id: number;
-  firstName: string;
-  lastName?: string;
-  username?: string;
-}
-
+interface AuthUser { id: number; firstName: string; lastName?: string; username?: string; }
 interface AuthContextValue {
   token: string | null;
   user: AuthUser | null;
   loading: boolean;
+  logout(): void;
 }
 
-const AuthContext = createContext<AuthContextValue>({ token: null, user: null, loading: true });
+const AuthContext = createContext<AuthContextValue>({ token: null, user: null, loading: true, logout: () => {} });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { ready } = useTelegram();
@@ -26,32 +24,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     const initData = (window as any).Telegram.WebApp.initData;
-    fetch('/auth', {
+    fetch(`${API_BASE}/auth`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ initData })
     })
-      .then(async res => {
-        const json = await res.json();
-        if (res.ok) {
-          setToken(json.token);
-          setUser({
-            id: json.user.id,
-            firstName: json.user.first_name,
-            lastName: json.user.last_name,
-            username: json.user.username
-          });
-          localStorage.setItem('jwt', json.token);
-        } else {
-          console.error('Auth failed', json);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    .then(res => res.json())
+    .then(json => {
+      if (json.token) {
+        setToken(json.token);
+        setUser({
+          id: json.user.id,
+          firstName: json.user.first_name,
+          lastName: json.user.last_name,
+          username: json.user.username
+        });
+        localStorage.setItem('jwt', json.token);
+      } else {
+        console.error('Auth failed', json);
+      }
+    })
+    .catch(console.error)
+    .finally(() => setLoading(false));
   }, [ready]);
 
+  const logout = () => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('jwt');
+  };
+
   return (
-    <AuthContext.Provider value={{ token, user, loading }}>
+    <AuthContext.Provider value={{ token, user, loading, logout }}>
       {children}
     </AuthContext.Provider>
   );
