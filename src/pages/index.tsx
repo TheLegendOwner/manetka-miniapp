@@ -16,7 +16,7 @@ function MainPage() {
   const [hasWallets, setHasWallets] = useState<boolean | null>(null);
   const [verified, setVerified] = useState(false);
 
-  // 1) After auth, load /api/wallets once
+  // 1) After auth, fetch existing wallets once
   useEffect(() => {
     if (!authLoading && token) {
       fetch('/api/wallets', {
@@ -31,7 +31,7 @@ function MainPage() {
     }
   }, [authLoading, token]);
 
-  // 2) Redirect to /wallet if we already have wallets or just verified
+  // 2) Redirect to /wallet if wallets exist or just verified
   useEffect(() => {
     if (!authLoading && token && (hasWallets === true || verified)) {
       router.replace('/wallet');
@@ -44,7 +44,7 @@ function MainPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // 4) Connect & verify flow using requestProof directly
+  // 4) Connect & verify flow using onStatusChange
   const connectTonWallet = useCallback(async () => {
     if (!token) return;
     try {
@@ -56,12 +56,23 @@ function MainPage() {
         data: { payload, timestamp }
       } = (await ppRes.json()) as { data: { payload: string; timestamp: number } };
 
-      // hand off to TonConnect UI
+      // pass payload/timestamp into TonConnect UI
       ;(tonConnectUI as any).setConnectRequestParameters({ payload, timestamp });
-      // requestProof opens modal and returns the signed proof
-      const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
+      // open the modal
+      tonConnectUI.openModal();
 
-      // verify on backend
+      // wait for the user to sign, capturing tonProof
+      const proof = await new Promise<any>(resolve => {
+        const unsub = tonConnectUI.onStatusChange(state => {
+          const tp = state?.connectItems?.tonProof;
+          if (tp) {
+            unsub();
+            resolve(tp);
+          }
+        });
+      });
+
+      // send proof to backend for verification
       await fetch('/api/verify', {
         method: 'POST',
         headers: {
@@ -74,6 +85,7 @@ function MainPage() {
         })
       });
 
+      // mark as verified so effect triggers redirect
       setVerified(true);
     } catch (err) {
       console.error('Connection or verification failed', err);
