@@ -1,9 +1,10 @@
+// next.config.js
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-
-};
-
-module.exports = {
+  images: {
+    domains: ['t.me', 'telegram.org'], // уже были
+  },
   async rewrites() {
     return [
       {
@@ -14,11 +15,8 @@ module.exports = {
         source: '/auth',
         destination: 'https://beethelegends.publicvm.com/auth'
       }
-    ]
-  },
-}
-module.exports = {
-  images: {
-    domains: ['t.me', 'telegram.org'], // добавь нужный
-  },
+    ];
+  }
 };
+
+module.exports = nextConfig;
