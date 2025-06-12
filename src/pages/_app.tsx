@@ -3,9 +3,10 @@
 
 import { useEffect } from 'react';
 import { AppProps } from 'next/app';
+import '../lib/i18n';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { TelegramProvider } from '../context/TelegramContext';
-import { SocketProvider } from '../context/WebSocketContext';
+import { AuthProvider } from '../context/AuthContext';
 import '../styles/globals.css';
 
 export default function App({ Component, pageProps }: AppProps) {
@@ -15,7 +16,6 @@ export default function App({ Component, pageProps }: AppProps) {
     document.addEventListener('gesturestart', onGestureStart);
 
     const onTouchMove = (e: TouchEvent) => {
-      // блокируем мультитач (pinch-зум)
       if (e.touches.length > 1) e.preventDefault();
     };
     document.addEventListener('touchmove', onTouchMove, { passive: false });
@@ -26,7 +26,7 @@ export default function App({ Component, pageProps }: AppProps) {
     };
   }, []);
 
-  // Используем абсолютный путь к манифесту на клиенте
+  // Абсолютный путь к манифесту TonConnect на клиенте
   const manifestUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/tonconnect-manifest.json`
     : undefined;
@@ -34,10 +34,9 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <TonConnectUIProvider manifestUrl={manifestUrl}>
       <TelegramProvider>
-        {/* Оборачиваем всё приложение в SocketProvider */}
-        <SocketProvider>
+        <AuthProvider>
           <Component {...pageProps} />
-        </SocketProvider>
+        </AuthProvider>
       </TelegramProvider>
     </TonConnectUIProvider>
   );
