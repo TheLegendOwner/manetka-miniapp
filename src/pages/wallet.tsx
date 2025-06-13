@@ -17,7 +17,7 @@ import {
 
 interface BalancesResponse {
   code: number;
-  data: { balances: Array<{ token: string; sums: Record<'balance' | 'usd' | 'ton', number> }> };
+  data: { balances: Array<{ token: string; sums: Record<'BALANCE' | 'USD' | 'TON' | 'RUB', number> }> };
 }
 interface RewardsResponse {
   code: number;
@@ -44,33 +44,7 @@ export default function WalletPage() {
   }>>([]);
   const [loading, setLoading] = useState(true);
 
-  const connectTonWallet = useCallback(async () => {
-    if (!token) return;
-    try {
-      const ppRes = await fetch('/api/proof-payload', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
-
-      const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
-
-      await fetch('/api/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ account: tonConnectUI.account, proof })
-      });
-
-      // After successful verify, reload wallets & balances
-      await fetchWalletsAndData();
-    } catch (err) {
-      console.error('Connect wallet failed', err);
-    }
-  }, [token, tonConnectUI]);
-
-  const fetchWalletsAndData = useCallback(async () => {
+   const fetchWalletsAndData = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
@@ -79,15 +53,8 @@ export default function WalletPage() {
       });
       const { data: { wallets } } = await wRes.json();
 
-      if (wallets.length === 0) {
-        // First time: server has no wallets, but user may have connected TON address
-        // Prompt connect flow
-        await connectTonWallet();
-        return;
-      }
-
       // Aggregate balances and rewards across all wallets
-      const balMap = new Map<string, { balance: number; usd: number; ton: number }>();
+      const balMap = new Map<string, { balance: number; usd: number; rub: number; ton: number }>();
       const rewMap = new Map<string, number>();
 
       for (const w of wallets) {
@@ -103,11 +70,12 @@ export default function WalletPage() {
         const { data: { rewards } }: RewardsResponse = await rRes.json();
 
         balances.forEach(b => {
-          const prev = balMap.get(b.token) ?? { balance: 0, usd: 0, ton: 0 };
+          const prev = balMap.get(b.token) ?? { balance: 0, usd: 0, rub: 0, ton: 0 };
           balMap.set(b.token, {
-            balance: prev.balance + b.sums.balance,
-            usd: prev.usd + b.sums.usd,
-            ton: prev.ton + b.sums.ton
+            balance: prev.balance + b.sums.BALANCE,
+            usd: prev.usd + b.sums.USD,
+            rub: prev.rub + b.sums.RUB,
+            ton: prev.ton + b.sums.TON
           });
         });
         rewards.forEach(r => {
@@ -129,7 +97,7 @@ export default function WalletPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, connectTonWallet]);
+  }, [token]);
 
   useEffect(() => {
     if (!authLoading && !token) {
@@ -145,19 +113,6 @@ export default function WalletPage() {
 
   if (authLoading || loading) {
     return <p className="p-4 text-center">Loading…</p>;
-  }
-
-  if (!tonAddress) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-white px-6">
-        <button
-          onClick={connectTonWallet}
-          className="w-[300px] h-[50px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold rounded-full"
-        >
-          {t('connect')}
-        </button>
-      </div>
-    );
   }
 
   return (
