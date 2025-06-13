@@ -66,48 +66,50 @@ function MainPage() {
   }, [token, tonConnectUI]);
 
   // Проверка TON Proof
-  const verifyWallet = useCallback(async () => {
-    const tonProof = wallet?.connectItems?.tonProof;
+  const verifyWallet = useCallback(
+      async (account: any, proof: any) => {
+        try {
+          const response = await fetch('/api/verify', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              account,
+              proof,
+            }),
+          });
 
-    if (!tonProof || !('proof' in tonProof)) {
-      alert('TON Proof not received. Try another wallet.');
-      tonConnectUI.disconnect();
-      return;
-    }
+          const result = await response.json();
 
-    try {
-      const response = await fetch('/api/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          account: wallet.account,
-          proof: tonProof.proof,
-        }),
-      });
+          if (result.verified) {
+            setVerified(true);
+            router.replace('/wallet');
+          } else {
+            alert('Verification failed. Try another wallet.');
+            tonConnectUI.disconnect();
+          }
+        } catch (err) {
+          console.error('Verification error:', err);
+        }
+      },
+      [token, router, tonConnectUI]
+  );
 
-      const result = await response.json();
-
-      if (result.verified) {
-        setVerified(true);
-        router.replace('/wallet');
-      } else {
-        alert('Verification failed. Try another wallet.');
-        tonConnectUI.disconnect();
-      }
-    } catch (err) {
-      console.error('Verification error:', err);
-    }
-  }, [token, wallet, tonConnectUI, router]);
-
-  // Автоматическая проверка, если tonProof получен
   useEffect(() => {
-    if (wallet?.connectItems?.tonProof && !verified) {
-      verifyWallet();
-    }
-  }, [wallet, verified, verifyWallet]);
+    const unsubscribe = tonConnectUI.onStatusChange(async (walletInfo) => {
+      if (
+          walletInfo &&
+          walletInfo.connectItems?.tonProof &&
+          'proof' in walletInfo.connectItems.tonProof
+      ) {
+        await verifyWallet(walletInfo.account, walletInfo.connectItems.tonProof.proof);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [verifyWallet, tonConnectUI]);
 
   // Показ загрузки, если токен ещё не получен
   if (authLoading || hasWallets === null) {
