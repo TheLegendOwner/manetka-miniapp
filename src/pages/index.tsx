@@ -94,7 +94,7 @@ function MainPage() {
       if (payloadData?.data?.payload) {
         tonConnectUI.setConnectRequestParameters({
           state: 'ready',
-          value: payloadData.data.payload
+          value: { tonProof: payloadData.data.payload}
         });
       } else {
         console.warn('No payload received');
