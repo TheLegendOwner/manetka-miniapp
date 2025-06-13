@@ -44,31 +44,6 @@ export default function WalletPage() {
   }>>([]);
   const [loading, setLoading] = useState(true);
 
-  const connectTonWallet = useCallback(async () => {
-    if (!token) return;
-    try {
-      const ppRes = await fetch('/api/proof-payload', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const { data: { payload, timestamp } }: ProofPayloadResponse = await ppRes.json();
-
-      const proof = await (tonConnectUI as any).requestProof({ payload, timestamp });
-
-      await fetch('/api/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ account: tonConnectUI.account, proof })
-      });
-
-      // After successful verify, reload wallets & balances
-      await fetchWalletsAndData();
-    } catch (err) {
-      console.error('Connect wallet failed', err);
-    }
-  }, [token, tonConnectUI]);
 
   const fetchWalletsAndData = useCallback(async () => {
     if (!token) return;
@@ -80,10 +55,7 @@ export default function WalletPage() {
       const { data: { wallets } } = await wRes.json();
 
       if (wallets.length === 0) {
-        // First time: server has no wallets, but user may have connected TON address
-        // Prompt connect flow
-        await connectTonWallet();
-        return;
+        router.replace('/');
       }
 
       // Aggregate balances and rewards across all wallets
@@ -129,7 +101,7 @@ export default function WalletPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, connectTonWallet]);
+  }, [token, router]);
 
   useEffect(() => {
     if (!authLoading && !token) {
@@ -145,19 +117,6 @@ export default function WalletPage() {
 
   if (authLoading || loading) {
     return <p className="p-4 text-center">Loading…</p>;
-  }
-
-  if (!tonAddress) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-white px-6">
-        <button
-          onClick={connectTonWallet}
-          className="w-[300px] h-[50px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold rounded-full"
-        >
-          {t('connect')}
-        </button>
-      </div>
-    );
   }
 
   return (

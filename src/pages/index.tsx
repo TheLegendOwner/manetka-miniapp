@@ -2,96 +2,113 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState, useCallback } from 'react';
-import { useTonConnectUI } from '@tonconnect/ui-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useIsConnectionRestored, useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import '../lib/i18n';
 
 function MainPage() {
   const [tonConnectUI] = useTonConnectUI();
-  const router = useRouter();
+  const wallet = useTonWallet();
   const { token, loading: authLoading } = useAuth();
-  const [delayedCheck, setDelayedCheck] = useState(false);
-  const [hasWallets, setHasWallets] = useState<boolean | null>(null);
-  const [verified, setVerified] = useState(false);
+  const router = useRouter();
 
-  // 1) After auth, fetch existing wallets once
+  const [payloadGenerated, setPayloadGenerated] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [hasWallets, setHasWallets] = useState<boolean | null>(null);
+
+  // Получение списка кошельков пользователя
   useEffect(() => {
     if (!authLoading && token) {
       fetch('/api/wallets', {
         headers: { Authorization: `Bearer ${token}` }
       })
-        .then(r => r.json())
-        .then(json => {
-          const list = json.data.wallets as any[];
-          setHasWallets(list.length > 0);
-        })
-        .catch(() => setHasWallets(false));
+          .then((r) => r.json())
+          .then((json) => {
+            const list = json.data.wallets as any[];
+            setHasWallets(list.length > 0);
+          })
+          .catch(() => setHasWallets(false));
     }
   }, [authLoading, token]);
 
-  // 2) Redirect to /wallet if wallets exist or just verified
+  // Перенаправление, если уже есть кошельки
   useEffect(() => {
-    if (!authLoading && token && (hasWallets === true || verified)) {
+    if (!authLoading && token && hasWallets) {
       router.replace('/wallet');
     }
-  }, [authLoading, token, hasWallets, verified, router]);
+  }, [authLoading, token, hasWallets, router]);
 
-  // 3) Delay showing the connect button to avoid flicker
-  useEffect(() => {
-    const timer = setTimeout(() => setDelayedCheck(true), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // 4) Connect & verify flow using onStatusChange
-  const connectTonWallet = useCallback(async () => {
-    if (!token) return;
+  // Запрос payload с backend и установка в TonConnectUI
+  const generateProofPayload = useCallback(async () => {
     try {
-      // fetch proof-payload from server
-      const ppRes = await fetch('/api/proof-payload', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const {
-        data: { payload, timestamp }
-      } = (await ppRes.json()) as { data: { payload: string; timestamp: number } };
+      if (!token) return;
 
-      // pass payload/timestamp into TonConnect UI
-      ;(tonConnectUI as any).setConnectRequestParameters({ payload, timestamp });
-      // open the modal
-      tonConnectUI.openModal();
-
-      // wait for the user to sign, capturing tonProof
-      const proof = await new Promise<any>(resolve => {
-        const unsub = tonConnectUI.onStatusChange(state => {
-          const tp = state?.connectItems?.tonProof;
-          if (tp) {
-            unsub();
-            resolve(tp);
-          }
-        });
+      const response = await fetch('/api/proof-payload', {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      // send proof to backend for verification
-      await fetch('/api/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          account: tonConnectUI.account,
-          proof
-        })
+      const data = await response.json();
+      if (!data?.data?.payload) throw new Error('No payload from server');
+
+      tonConnectUI.setConnectRequestParameters({
+        state: 'ready',
+        value: data.data.payload,
       });
 
-      // mark as verified so effect triggers redirect
-      setVerified(true);
+      setPayloadGenerated(true);
     } catch (err) {
-      console.error('Connection or verification failed', err);
+      console.error('Failed to generate payload:', err);
+      tonConnectUI.setConnectRequestParameters(null);
     }
   }, [token, tonConnectUI]);
 
+  // Проверка TON Proof
+  const verifyWallet = useCallback(async () => {
+    const tonProof = wallet?.connectItems?.tonProof;
+
+    if (!tonProof || !('proof' in tonProof)) {
+      alert('TON Proof not received. Try another wallet.');
+      tonConnectUI.disconnect();
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          account: wallet.account,
+          proof: tonProof.proof,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.verified) {
+        setVerified(true);
+        router.replace('/wallet');
+      } else {
+        alert('Verification failed. Try another wallet.');
+        tonConnectUI.disconnect();
+      }
+    } catch (err) {
+      console.error('Verification error:', err);
+    }
+  }, [token, wallet, tonConnectUI, router]);
+
+  // Автоматическая проверка, если tonProof получен
+  useEffect(() => {
+    if (wallet?.connectItems?.tonProof && !verified) {
+      verifyWallet();
+    }
+  }, [wallet, verified, verifyWallet]);
+
+  // Показ загрузки, если токен ещё не получен
   if (authLoading || hasWallets === null) {
     return <p className="p-4 text-center">Loading authentication…</p>;
   }
@@ -108,10 +125,10 @@ function MainPage() {
         </p>
       </div>
 
-      {hasWallets === false && delayedCheck && (
+      {hasWallets === false && (
         <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
           <button
-            onClick={connectTonWallet}
+            onClick={generateProofPayload}
             disabled={!token}
             className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] disabled:opacity-50 text-gray-900 font-semibold text-base rounded-full shadow-md"
           >

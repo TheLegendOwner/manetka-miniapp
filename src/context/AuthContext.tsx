@@ -5,7 +5,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { useTelegram } from './TelegramContext';
 import { API_BASE } from '../config/api';
 
-interface AuthUser { id: number; firstName: string; lastName?: string; username?: string; }
+interface AuthUser { id: number; telegramId: number; referralCode: string; createdAt: string; invitedBy?: number }
 interface AuthContextValue {
   token: string | null;
   user: AuthUser | null;
@@ -35,9 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(json.token);
         setUser({
           id: json.user.id,
-          firstName: json.user.first_name,
-          lastName: json.user.last_name,
-          username: json.user.username
+          telegramId: json.user.telegram_id,
+          referralCode: json.user.referral_code,
+          createdAt: json.user.created_at,
+          invitedBy: json.user.invited_by
         });
         localStorage.setItem('jwt', json.token);
       } else {
