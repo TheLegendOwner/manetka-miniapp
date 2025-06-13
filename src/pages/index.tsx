@@ -58,6 +58,7 @@ function MainPage() {
       });
 
       setPayloadGenerated(true);
+      tonConnectUI.openModal();
     } catch (err) {
       console.error('Failed to generate payload:', err);
       tonConnectUI.setConnectRequestParameters(null);
