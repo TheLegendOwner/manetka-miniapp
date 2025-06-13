@@ -8,49 +8,68 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import '../lib/i18n';
 
+const payloadTTLMS = 1000 * 60 * 20;
+
 function MainPage() {
   const [tonConnectUI] = useTonConnectUI();
   const wallet = useTonWallet();
-  const { token, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { token, loading: authLoading } = useAuth();
 
-  const [payloadGenerated, setPayloadGenerated] = useState(false);
-  const [verified, setVerified] = useState(false);
+  const [delayedCheck, setDelayedCheck] = useState(false);
   const [hasWallets, setHasWallets] = useState<boolean | null>(null);
+  const [verified, setVerified] = useState(false);
+  const [payloadGenerated, setPayloadGenerated] = useState(false);
+  const payloadInterval = useRef<number | null>(null);
 
-  // Получение списка кошельков пользователя
+  // 🔍 1. Проверяем, есть ли уже кошельки у пользователя
   useEffect(() => {
     if (!authLoading && token) {
       fetch('/api/wallets', {
         headers: { Authorization: `Bearer ${token}` }
       })
-          .then((r) => r.json())
-          .then((json) => {
+          .then(r => r.json())
+          .then(json => {
             const list = json.data.wallets as any[];
             setHasWallets(list.length > 0);
+            console.log('Wallets fetched:', list);
           })
-          .catch(() => setHasWallets(false));
+          .catch(err => {
+            console.warn('Wallet fetch error', err);
+            setHasWallets(false);
+          });
     }
   }, [authLoading, token]);
 
-  // Перенаправление, если уже есть кошельки
+  // 🔁 2. Если пользователь авторизован и есть кошелек — редиректим
   useEffect(() => {
-    if (!authLoading && token && hasWallets) {
+    if (!authLoading && token && (hasWallets || verified)) {
+      console.log('Redirecting to /wallet');
       router.replace('/wallet');
     }
-  }, [authLoading, token, hasWallets, router]);
+  }, [authLoading, token, hasWallets, verified, router]);
 
-  // Запрос payload с backend и установка в TonConnectUI
+  // ⏳ 3. Задержка для показа кнопки
+  useEffect(() => {
+    const timer = setTimeout(() => setDelayedCheck(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ⚙️ 4. Генерация payload и запуск модального окна
   const generateProofPayload = useCallback(async () => {
+    if (!token) return;
     try {
-      if (!token) return;
-
+      console.log('Requesting proof payload...');
       const response = await fetch('/api/proof-payload', {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       const data = await response.json();
-      if (!data?.data?.payload) throw new Error('No payload from server');
+
+      if (!data?.data?.payload) {
+        console.warn('No payload in response');
+        tonConnectUI.setConnectRequestParameters(null);
+        return;
+      }
 
       tonConnectUI.setConnectRequestParameters({
         state: 'ready',
@@ -58,17 +77,41 @@ function MainPage() {
       });
 
       setPayloadGenerated(true);
+      console.log('Payload set in TonConnectUI');
+
       tonConnectUI.openModal();
+
+      if (payloadInterval.current !== null) {
+        clearInterval(payloadInterval.current);
+      }
+      payloadInterval.current = window.setInterval(() => {
+        console.log('Refreshing proof payload...');
+        generateProofPayload();
+      }, payloadTTLMS);
     } catch (err) {
       console.error('Failed to generate payload:', err);
       tonConnectUI.setConnectRequestParameters(null);
     }
   }, [token, tonConnectUI]);
 
-  // Проверка TON Proof
-  const verifyWallet = useCallback(
-      async (account: any, proof: any) => {
+  useEffect(() => {
+    console.log('Wallet updated:', wallet);
+
+    if (
+        wallet?.account &&
+        wallet?.connectItems?.tonProof &&
+        'proof' in wallet.connectItems.tonProof &&
+        !verified
+    ) {
+      const verifyWallet = async () => {
         try {
+          const tonProof = wallet.connectItems?.tonProof;
+
+          if (!tonProof || !('proof' in tonProof)) return;
+
+          const proof = tonProof.proof; // теперь тип безопасен
+          console.log('Verifying wallet...', proof);
+
           const response = await fetch('/api/verify', {
             method: 'POST',
             headers: {
@@ -76,12 +119,13 @@ function MainPage() {
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
-              account,
-              proof,
+              account: wallet.account,
+              proof: proof,
             }),
           });
 
           const result = await response.json();
+          console.log('Verify response:', result);
 
           if (result.verified) {
             setVerified(true);
@@ -93,25 +137,13 @@ function MainPage() {
         } catch (err) {
           console.error('Verification error:', err);
         }
-      },
-      [token, router, tonConnectUI]
-  );
+      };
 
-  useEffect(() => {
-    const unsubscribe = tonConnectUI.onStatusChange(async (walletInfo) => {
-      if (
-          walletInfo &&
-          walletInfo.connectItems?.tonProof &&
-          'proof' in walletInfo.connectItems.tonProof
-      ) {
-        await verifyWallet(walletInfo.account, walletInfo.connectItems.tonProof.proof);
-      }
-    });
+      verifyWallet();
+    }
+  }, [wallet, verified, token, router, tonConnectUI]);
 
-    return () => unsubscribe();
-  }, [verifyWallet, tonConnectUI]);
-
-  // Показ загрузки, если токен ещё не получен
+  // 🌀 6. Загрузка
   if (authLoading || hasWallets === null) {
     return <p className="p-4 text-center">Loading authentication…</p>;
   }
@@ -132,7 +164,7 @@ function MainPage() {
         <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
           <button
             onClick={generateProofPayload}
-            disabled={!token}
+            disabled={!token || payloadGenerated}
             className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] disabled:opacity-50 text-gray-900 font-semibold text-base rounded-full shadow-md"
           >
             {token ? 'Connect your TON Wallet' : 'Waiting for login…'}
