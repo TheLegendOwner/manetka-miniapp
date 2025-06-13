@@ -55,32 +55,57 @@ function MainPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // ⚙️ 4. Генерация payload и запуск модального окна
-  const generateProofPayload = useCallback(async () => {
-    if (!token) return;
+  const generateProofPayload = async () => {
     try {
-      console.log('Requesting proof payload...');
-      const response = await fetch('/api/proof-payload', {
-        headers: { Authorization: `Bearer ${token}` },
+      const payloadResponse = await fetch('/api/proof-payload', {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      const data = await response.json();
 
-      if (!data?.data?.payload) {
-        console.warn('No payload in response');
+      const payloadData = await payloadResponse.json();
+      console.log('Updated payload response:', payloadData);
+
+      if (payloadData?.data?.payload) {
+        tonConnectUI.setConnectRequestParameters({
+          state: 'ready',
+          value: payloadData.data.payload
+        });
+      } else {
+        tonConnectUI.setConnectRequestParameters(null);
+      }
+    } catch (err) {
+      console.error('Failed to refresh proof payload', err);
+      tonConnectUI.setConnectRequestParameters(null);
+    }
+  };
+
+  const connectTonWallet = async () => {
+    if (!token) return;
+
+    try {
+      console.log('Opening wallet modal...');
+
+      const payloadResponse = await fetch('/api/proof-payload', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const payloadData = await payloadResponse.json();
+      console.log('Payload response:', payloadData);
+
+      if (payloadData?.data?.payload) {
+        tonConnectUI.setConnectRequestParameters({
+          state: 'ready',
+          value: payloadData.data.payload
+        });
+      } else {
+        console.warn('No payload received');
         tonConnectUI.setConnectRequestParameters(null);
         return;
       }
 
-      tonConnectUI.setConnectRequestParameters({
-        state: 'ready',
-        value: data.data.payload,
-      });
-
-      setPayloadGenerated(true);
-      console.log('Payload set in TonConnectUI');
-
+      // Шаг 3: Открытие модалки
       tonConnectUI.openModal();
 
+      // (опционально) Автообновление payload
       if (payloadInterval.current !== null) {
         clearInterval(payloadInterval.current);
       }
@@ -88,11 +113,11 @@ function MainPage() {
         console.log('Refreshing proof payload...');
         generateProofPayload();
       }, payloadTTLMS);
+
     } catch (err) {
-      console.error('Failed to generate payload:', err);
-      tonConnectUI.setConnectRequestParameters(null);
+      console.error('Connection error:', err);
     }
-  }, [token, tonConnectUI]);
+  };
 
   useEffect(() => {
     console.log('Wallet updated:', wallet);
@@ -163,7 +188,7 @@ function MainPage() {
       {hasWallets === false && (
         <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
           <button
-            onClick={generateProofPayload}
+            onClick={connectTonWallet}
             disabled={!token || payloadGenerated}
             className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] disabled:opacity-50 text-gray-900 font-semibold text-base rounded-full shadow-md"
           >
