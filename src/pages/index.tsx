@@ -41,7 +41,6 @@ function MainPage() {
     }
   }, [authLoading, token]);
 
-  // 🔁 2. Если пользователь авторизован и есть кошелек — редиректим
   useEffect(() => {
     if (!authLoading && token && (hasWallets || verified)) {
       console.log('Redirecting to /wallet');
@@ -49,7 +48,6 @@ function MainPage() {
     }
   }, [authLoading, token, hasWallets, verified, router]);
 
-  // ⏳ 3. Задержка для показа кнопки
   useEffect(() => {
     const timer = setTimeout(() => setDelayedCheck(true), 500);
     return () => clearTimeout(timer);
@@ -102,10 +100,8 @@ function MainPage() {
         return;
       }
 
-      // Шаг 3: Открытие модалки
       tonConnectUI.openModal();
 
-      // (опционально) Автообновление payload
       if (payloadInterval.current !== null) {
         clearInterval(payloadInterval.current);
       }
@@ -152,7 +148,7 @@ function MainPage() {
           const result = await response.json();
           console.log('Verify response:', result);
 
-          if (result.verified) {
+          if (result.data.valid) {
             setVerified(true);
             router.replace('/wallet');
           } else {
@@ -168,7 +164,6 @@ function MainPage() {
     }
   }, [wallet, verified, token, router, tonConnectUI]);
 
-  // 🌀 6. Загрузка
   if (authLoading || hasWallets === null) {
     return <p className="p-4 text-center">Loading authentication…</p>;
   }

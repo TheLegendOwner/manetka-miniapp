@@ -3,7 +3,6 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useTelegram } from './TelegramContext';
-import { API_BASE } from '../config/api';
 
 interface AuthUser { id: number; telegramId: number; referralCode: string; createdAt: string; invitedBy?: number }
 interface AuthContextValue {
