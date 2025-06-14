@@ -108,10 +108,10 @@ export default function WalletPage() {
   }, [authLoading, token, router]);
 
   useEffect(() => {
-    if (token && tonAddress) {
+    if (token) {
       fetchWalletsAndData();
     }
-  }, [token, tonAddress, fetchWalletsAndData]);
+  }, [token, fetchWalletsAndData]);
 
   if (authLoading || loading) {
     return <p className="p-4 text-center">Loading…</p>;

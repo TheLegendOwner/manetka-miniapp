@@ -55,6 +55,7 @@ export default function AccountPage() {
 
   const fetchWallets = useCallback(async () => {
     if (!token) return;
+    setLoading(true);
     try {
       const wRes = await fetch('/api/wallets', {
         headers: { Authorization: `Bearer ${token}` }
@@ -117,7 +118,13 @@ export default function AccountPage() {
     }
   };
 
-  if (loading) {
+  useEffect(() => {
+    if (token) {
+      fetchWallets();
+    }
+  }, [token, fetchWallets]);
+
+  if (authLoading || loading) {
     return <p className="p-4 text-center">Loading…</p>;
   }
 
