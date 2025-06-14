@@ -46,7 +46,7 @@ export default function RefsPage() {
   // Build referral link and fetch real referrals from API
   useEffect(() => {
     if (tgReady && token && tonAddress && user) {
-      setReferralLink(`https://t.me/manetka_bot/app?startapp=ref${user.id}`);
+      setReferralLink(`https://t.me/manetkawallet_bot/app?startapp=ref${user.id}`);
 
       (async () => {
         try {

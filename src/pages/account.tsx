@@ -11,7 +11,7 @@ import {
   Image as ImageIcon,
   Users,
   Share2,
-  ArrowLeft
+  ArrowLeft, Copy, Trash2
 } from 'lucide-react';
 import { Address } from '@ton/core';
 import '../lib/i18n';
@@ -76,11 +76,16 @@ export default function AccountPage() {
     }
   }, [token]);
 
+  const disconnect = async (wallet_id: string) => {
+    const disconnectResp = await fetch(`/api/wallet/${wallet_id}/disconnect`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
 
-  const disconnect = async () => {
-    await tonConnectUI.disconnect();
-    router.replace('/');
-  };
+    const json = await disconnectResp.json();
+    if (json.data.disconnected) {
+      fetchWallets();
+    }
+  }
 
   const copyToClipboard = (address: string) => {
     navigator.clipboard.writeText(address);
@@ -218,33 +223,18 @@ export default function AccountPage() {
                           <span className="text-xs text-green-600 mt-1">{t('main_wallet')}</span>
                       )}
                     </div>
-                    <button
-                        onClick={() => copyToClipboard(wallet.address)}
-                        className="ml-4 px-3 py-1 text-sm font-medium rounded-full bg-[#EBB923] text-black"
-                    >
-                      {t('copy')}
+
+                    <button onClick={() => copyToClipboard(wallet.address)} className="text-yellow-600">
+                      <Copy size={24} />
+                    </button>
+
+                    <button onClick={() => disconnect(wallet.wallet_id)} className="text-red-600">
+                      <Trash2 size={24} />
                     </button>
                   </div>
               ))
           )}
         </div>
-
-        {/* Connect / Disconnect Button */}
-        {tonConnectUI.account ? (
-          <button
-            onClick={disconnect}
-            className="w-full bg-black text-white text-sm py-3 rounded-full uppercase"
-          >
-            {t('disconnect')}
-          </button>
-        ) : (
-          <button
-            onClick={addWallet}
-            className="w-full bg-black text-white text-sm py-3 rounded-full uppercase"
-          >
-            {t('connect')}
-          </button>
-        )}
       </div>
 
       {/* Bottom Nav */}
