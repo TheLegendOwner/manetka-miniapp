@@ -150,6 +150,7 @@ function MainPage() {
 
           if (result.data.valid) {
             setVerified(true);
+            tonConnectUI.disconnect();
             router.replace('/wallet');
           } else {
             alert('Verification failed. Try another wallet.');
@@ -163,6 +164,7 @@ function MainPage() {
       verifyWallet();
     }
   }, [wallet, verified, token, router, tonConnectUI]);
+
 
   if (authLoading || hasWallets === null) {
     return <p className="p-4 text-center">Loading authentication…</p>;

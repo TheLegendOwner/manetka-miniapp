@@ -17,22 +17,35 @@ import { Address } from '@ton/core';
 import '../lib/i18n';
 import { useTelegram } from '../context/TelegramContext';
 import { useAuth } from '../context/AuthContext';
+import {useCallback, useEffect, useState} from "react";
 
 export default function AccountPage() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const { user, ready } = useTelegram();
-  const { token } = useAuth();
   const [tonConnectUI] = useTonConnectUI();
   const tonAddress = useTonAddress();
+  const { token, loading: authLoading } = useAuth();
+  const [loading, setLoading] = useState(true);
 
-  if (!ready) {
-    return <p>Инициализация Telegram...</p>;
-  }
+  const [wallets, setWallets] = useState<Array<{
+    wallet_id: string;
+    address: string;
+    main: boolean;
+  }>>([]);
 
-  if (!user && !tonAddress) {
-    return <p>Данные пользователя недоступны.</p>;
-  }
+  type WalletFromServer = {
+    wallet_id: string;
+    address: string;
+    main: boolean;
+    connected_at: string;
+  };
+
+  useEffect(() => {
+    if (!authLoading && !token) {
+      router.replace('/');
+    }
+  }, [authLoading, token, router]);
 
   const avatarSrc =
     user?.photo_url || `/icons/avatar${Math.floor(Math.random() * 11) + 1}.svg`;
@@ -40,25 +53,36 @@ export default function AccountPage() {
   const lastName = user?.last_name || '';
   const username = user?.username;
 
-  const walletAddress =
-    tonAddress ||
-    (tonConnectUI.account?.address
-      ? Address.parseRaw(tonConnectUI.account.address).toString({
-          urlSafe: true,
-          bounceable: true,
-          testOnly: false
-        })
-      : '');
+  const fetchWallets = useCallback(async () => {
+    if (!token) return;
+    try {
+      const wRes = await fetch('/api/wallets', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await wRes.json();
+      const wallets: WalletFromServer[] = json.data.wallets;
+      setWallets(
+          wallets.map(({ wallet_id, address, main }) => ({
+            wallet_id,
+            address,
+            main
+          }))
+      );
+    } catch (e) {
+      console.error('Fetch wallet data failed', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
 
   const disconnect = async () => {
     await tonConnectUI.disconnect();
     router.replace('/');
   };
 
-  const copyAddress = () => {
-    if (walletAddress) {
-      navigator.clipboard.writeText(walletAddress);
-    }
+  const copyToClipboard = (address: string) => {
+    navigator.clipboard.writeText(address);
   };
 
   const addWallet = async () => {
@@ -92,6 +116,10 @@ export default function AccountPage() {
       console.error('Add wallet failed', err);
     }
   };
+
+  if (loading) {
+    return <p className="p-4 text-center">Loading…</p>;
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB] font-['Aboreto']">
@@ -162,21 +190,36 @@ export default function AccountPage() {
         {/* Wallet Address */}
         <div>
           <p className="text-[14px] text-[#171A1F] font-semibold">
-            {t('your_wallet_address')}:
+            {t('your_wallet_addresses')}:
           </p>
-          <div className="bg-white p-4 rounded-lg border border-gray-200 flex items-center justify-between">
-            <p className="text-[14px] text-[#171A1F] break-all">
-              {walletAddress || t('no_wallet_connected')}
-            </p>
-            {walletAddress && (
-              <button
-                onClick={copyAddress}
-                className="ml-4 px-3 py-1 text-sm font-medium rounded-full bg-[#EBB923] text-black"
-              >
-                {t('copy')}
-              </button>
-            )}
-          </div>
+
+          {wallets.length === 0 ? (
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <p className="text-[14px] text-[#171A1F]">{t('no_wallet_connected')}</p>
+              </div>
+          ) : (
+              wallets.map((wallet) => (
+                  <div
+                      key={wallet.wallet_id}
+                      className="bg-white p-4 rounded-lg border border-gray-200 flex items-center justify-between mt-2"
+                  >
+                    <div className="flex flex-col">
+                      <p className="text-[14px] text-[#171A1F] break-all">
+                        {wallet.address}
+                      </p>
+                      {wallet.main && (
+                          <span className="text-xs text-green-600 mt-1">{t('main_wallet')}</span>
+                      )}
+                    </div>
+                    <button
+                        onClick={() => copyToClipboard(wallet.address)}
+                        className="ml-4 px-3 py-1 text-sm font-medium rounded-full bg-[#EBB923] text-black"
+                    >
+                      {t('copy')}
+                    </button>
+                  </div>
+              ))
+          )}
         </div>
 
         {/* Connect / Disconnect Button */}
