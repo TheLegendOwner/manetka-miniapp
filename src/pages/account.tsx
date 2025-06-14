@@ -77,7 +77,7 @@ export default function AccountPage() {
   }, [token]);
 
   const disconnect = async (wallet_id: string) => {
-    const disconnectResp = await fetch(`/api/wallet/${wallet_id}/disconnect`, {
+    const disconnectResp = await fetch(`/api/wallets/${wallet_id}/disconnect`, {
       headers: { Authorization: `Bearer ${token}` }
     });
 
