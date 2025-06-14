@@ -78,7 +78,10 @@ export default function AccountPage() {
 
   const disconnect = async (wallet_id: string) => {
     const disconnectResp = await fetch(`/api/wallets/${wallet_id}/disconnect`, {
-      headers: { Authorization: `Bearer ${token}` }
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` }
     });
 
     const json = await disconnectResp.json();
@@ -220,17 +223,19 @@ export default function AccountPage() {
                         {wallet.address}
                       </p>
                       {wallet.main && (
-                          <span className="text-xs text-green-600 mt-1">{t('main_wallet')}</span>
+                          // <span className="text-xs text-green-600 mt-1">{t('main_wallet')}</span>
+                        <span className="text-xs text-green-600 mt-1">MAIN</span>
                       )}
                     </div>
 
-                    <button onClick={() => copyToClipboard(wallet.address)} className="text-yellow-600">
-                      <Copy size={24} />
-                    </button>
-
-                    <button onClick={() => disconnect(wallet.wallet_id)} className="text-red-600">
-                      <Trash2 size={24} />
-                    </button>
+                    <div className="flex items-center space-x-4">
+                      <button onClick={() => copyToClipboard(wallet.address)} className="text-yellow-600">
+                        <Copy size={24} />
+                      </button>
+                      <button onClick={() => disconnect(wallet.wallet_id)} className="text-red-600">
+                        <Trash2 size={24} />
+                      </button>
+                    </div>
                   </div>
               ))
           )}
