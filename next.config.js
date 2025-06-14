@@ -16,7 +16,20 @@ const nextConfig = {
         destination: 'https://beethelegends.publicvm.com/auth'
       }
     ];
-  }
+  },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Permissions-Policy',
+            value: 'clipboard-write=(self)',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
