@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { useTelegram } from '../context/TelegramContext';
 import Image from 'next/image';
 import {
   Wallet as WalletIcon,
@@ -32,6 +33,7 @@ export default function WalletPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const { token, loading: authLoading } = useAuth();
+  const { user } = useTelegram();
   const [tonConnectUI] = useTonConnectUI();
   const tonAddress = useTonAddress();
 
@@ -116,11 +118,23 @@ export default function WalletPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F9FAFB]">
-      {/* Header */}
-      <div className="px-5 py-4 border-b bg-white">
-        <h1 className="text-lg font-semibold uppercase">{t('token_assets')}</h1>
-      </div>
+      <div className="flex flex-col min-h-screen bg-[#F9FAFB] font-['Aboreto']">
+        {/* Header */}
+          <div className="flex justify-between items-center px-5 py-4 border-b bg-white">
+            <h1 className="text-lg font-semibold uppercase">{t('token_assets')}</h1>
+            <div
+                className="w-9 h-9 rounded-full overflow-hidden cursor-pointer"
+                onClick={() => router.push('/account')}
+            >
+              <Image
+                  src={user?.photo_url || '/icons/avatar-default.svg'}
+                  alt="avatar"
+                  width={36}
+                  height={36}
+                  unoptimized
+              />
+            </div>
+          </div>
       {/* Tokens */}
       <div className="flex-1 px-4 pt-4 pb-24 space-y-4">
         {tokens.map(tok => (
