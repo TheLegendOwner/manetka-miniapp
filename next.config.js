@@ -3,7 +3,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['t.me', 'telegram.org'], // уже были
+    domains: ['t.me', 'telegram.org', 'tonapi.io'], // уже были
   },
   async rewrites() {
     return [
