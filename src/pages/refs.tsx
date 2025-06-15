@@ -135,7 +135,7 @@ export default function RefsPage() {
         <div className="bg-white rounded-xl border divide-y divide-gray-100">
           {referrals.map((ref, i) => (
             <div key={i} className="flex justify-between items-center p-4">
-              <div className="w-[75px] h-[75px] rounded-full overflow-hidden border border-gray-300">
+              <div className="w-[30px] h-[30px] rounded-full overflow-hidden border border-gray-300">
                 <Image
                     src={ref.avatar}
                     alt="avatar"
