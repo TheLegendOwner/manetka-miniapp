@@ -7,7 +7,7 @@ import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import '../lib/i18n';
-import {toast} from "react-toastify";
+import {toast} from 'react-toastify';
 import {useTranslation} from "react-i18next";
 
 const payloadTTLMS = 1000 * 60 * 20;
@@ -145,15 +145,16 @@ function MainPage() {
           const result = await response.json();
           console.log('Verify response:', result);
 
-          if (result.data.valid) {
+          if (result.status === 0 && result.data.valid) {
+            toast.success(t('wallet_added'));
             setVerified(true);
-            toast.success(t("wallet_added"), {position:"top-center"});
             router.replace('/wallet');
           } else {
-            alert('Verification failed. Try another wallet.');
+            toast.error(t('wallet_verification_failed'));
           }
         } catch (err) {
           console.error('Verification error:', err);
+          toast.error(t('wallet_verification_error'));
         } finally {
           tonConnectUI.disconnect();
         }

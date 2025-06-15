@@ -8,7 +8,7 @@ import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { TelegramProvider } from '../context/TelegramContext';
 import { AuthProvider } from '../context/AuthContext';
 import '../styles/globals.css';
-import { ToastContainer, toast } from 'react-toastify';
+import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function App({ Component, pageProps }: AppProps) {
@@ -37,8 +37,8 @@ export default function App({ Component, pageProps }: AppProps) {
     <TonConnectUIProvider manifestUrl={manifestUrl}>
       <TelegramProvider>
         <AuthProvider>
-          <ToastContainer/>
           <Component {...pageProps} />
+          <ToastContainer position="top-right" autoClose={4000} />
         </AuthProvider>
       </TelegramProvider>
     </TonConnectUIProvider>

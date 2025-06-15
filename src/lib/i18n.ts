@@ -28,6 +28,8 @@ const resources = {
       your_wallet_address: 'Your wallet address',
       no_wallet_connected: 'No wallet connected',
       wallet_added: "Wallet successfully added",
+      wallet_verification_failed: "Verification failed. Try another wallet.",
+      wallet_verification_error: "Unknown error. Contact the developer.",
       // …add any other keys you use…
     },
   },
@@ -55,6 +57,8 @@ const resources = {
       your_wallet_address: 'Ваш адрес кошелька',
       no_wallet_connected: 'Кошелек не подключен',
       wallet_added: "Кошелек успешно добавлен",
+      wallet_verification_failed: "Ошибка верификации. Попробуйте другой кошелёк.",
+      wallet_verification_error: "Неизвестная ошибка. Обратитесь к разработчику.",
       // …добавьте остальные ключи…
     },
   },
