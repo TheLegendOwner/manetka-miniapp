@@ -42,7 +42,7 @@ export default function AccountPage() {
   };
 
   useEffect(() => {
-    if ((!authLoading && !token) || wallets.length === 0) {
+    if (!authLoading && !token) {
       router.replace('/');
     }
   }, [authLoading, token, router]);
@@ -62,6 +62,9 @@ export default function AccountPage() {
       });
       const json = await wRes.json();
       const wallets: WalletFromServer[] = json.data.wallets;
+      if (wallets.length === 0) {
+        router.replace('/');
+      }
       setWallets(
           wallets.map(({ wallet_id, address, main }) => ({
             wallet_id,
@@ -74,7 +77,7 @@ export default function AccountPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, router]);
 
   const disconnect = async (wallet_id: string) => {
     const disconnectResp = await fetch(`/api/wallets/${wallet_id}/disconnect`, {
