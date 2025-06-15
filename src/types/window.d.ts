@@ -14,6 +14,7 @@ interface TelegramWebApp {
   initDataUnsafe: {
     user?: TelegramUser;
   };
+  copyText?: (text: string) => Promise<void> | void;
 }
 
 interface Window {

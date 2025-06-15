@@ -13,7 +13,6 @@ import {
   Share2,
   ArrowLeft, Copy, Trash2
 } from 'lucide-react';
-import { Address } from '@ton/core';
 import '../lib/i18n';
 import { useTelegram } from '../context/TelegramContext';
 import { useAuth } from '../context/AuthContext';
@@ -99,8 +98,30 @@ export default function AccountPage() {
     }
   }
 
+  const fallbackCopyToClipboard = (text: string) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed'; // avoid scrolling to bottom
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      const successful = document.execCommand('copy');
+      console.log(successful ? 'Copied!' : 'Copy failed');
+    } catch (err) {
+      console.error('Fallback: Oops, unable to copy', err);
+    }
+
+    document.body.removeChild(textArea);
+  };
+
   const copyToClipboard = (address: string) => {
-    navigator.clipboard.writeText(address);
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.copyText) {
+      window.Telegram.WebApp.copyText(address);
+    } else {
+      navigator.clipboard.writeText(address);
+    }
   };
 
   const generateProofPayload = async () => {
