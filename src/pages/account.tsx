@@ -18,6 +18,7 @@ import { useTelegram } from '../context/TelegramContext';
 import { useAuth } from '../context/AuthContext';
 import {useCallback, useEffect, useRef, useState} from "react";
 import {toast} from "react-toastify";
+import { copyTextToClipboard } from '@telegram-apps/sdk';
 
 export default function AccountPage() {
   const router = useRouter();
@@ -97,32 +98,6 @@ export default function AccountPage() {
       fetchWallets();
     }
   }
-
-  const fallbackCopyToClipboard = (text: string) => {
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed'; // avoid scrolling to bottom
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-
-    try {
-      const successful = document.execCommand('copy');
-      console.log(successful ? 'Copied!' : 'Copy failed');
-    } catch (err) {
-      console.error('Fallback: Oops, unable to copy', err);
-    }
-
-    document.body.removeChild(textArea);
-  };
-
-  const copyToClipboard = (address: string) => {
-    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.copyText) {
-      window.Telegram.WebApp.copyText(address);
-    } else {
-      navigator.clipboard.writeText(address);
-    }
-  };
 
   const generateProofPayload = async () => {
     try {
@@ -342,7 +317,7 @@ export default function AccountPage() {
                     </div>
 
                     <div className="flex items-center space-x-4">
-                      <button onClick={() => copyToClipboard(wallet.address)} className="text-yellow-600">
+                      <button onClick={() => copyTextToClipboard(wallet.address)} className="text-yellow-600">
                         <Copy size={24} />
                       </button>
                       <button onClick={() => disconnect(wallet.wallet_id)} className="text-red-600">

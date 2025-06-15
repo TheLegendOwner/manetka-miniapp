@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import '../lib/i18n';
 import Image from "next/image";
+import { copyTextToClipboard,shareURL } from '@telegram-apps/sdk';
 
 interface Referral {
   first_name: string;
@@ -73,11 +74,10 @@ export default function RefsPage() {
     return null;
   }
 
-  const copyReferral = () => {
-    navigator.clipboard.writeText(referralLink);
-  };
   const shareReferral = () => {
-    if (navigator.share) {
+    if (shareURL.isAvailable()) {
+      shareURL(referralLink, `${t('join_manetka')}: ${referralLink}`)
+    } else if (navigator.share) {
       navigator.share({
         title: 'Manetka',
         text: `${t('join_manetka')}: ${referralLink}`,
@@ -120,7 +120,7 @@ export default function RefsPage() {
             <div className="flex-1 bg-gray-100 text-sm border rounded-full px-4 py-2 break-all">
               {referralLink}
             </div>
-            <button onClick={copyReferral} className="text-yellow-600">
+            <button onClick={() => copyTextToClipboard(referralLink)} className="text-yellow-600">
               <Copy size={24} />
             </button>
             <button onClick={shareReferral} className="text-yellow-600">
