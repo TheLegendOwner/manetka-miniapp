@@ -45,7 +45,14 @@ function MainPage() {
   useEffect(() => {
     if (!authLoading && token && (hasWallets || verified)) {
       console.log('Redirecting to /wallet');
-      router.replace('/wallet');
+      if (verified) {
+        router.replace({
+          pathname: '/wallet',
+          query: { verified: '1' }
+        });
+      } else {
+        router.replace('/wallet');
+      }
     }
   }, [authLoading, token, hasWallets, verified, router]);
 
@@ -147,10 +154,6 @@ function MainPage() {
 
           if (result.code === 0 && result.data.valid) {
             setVerified(true);
-            router.replace({
-              pathname: '/wallet',
-              query: { verified: '1' }
-            });
           } else {
             toast.error(t('wallet_verification_failed'));
           }
