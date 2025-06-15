@@ -2,8 +2,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useIsConnectionRestored, useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
+import { useEffect, useState, useRef } from 'react';
+import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import '../lib/i18n';
@@ -16,13 +16,11 @@ function MainPage() {
   const router = useRouter();
   const { token, loading: authLoading } = useAuth();
 
-  const [delayedCheck, setDelayedCheck] = useState(false);
   const [hasWallets, setHasWallets] = useState<boolean | null>(null);
   const [verified, setVerified] = useState(false);
   const [payloadGenerated, setPayloadGenerated] = useState(false);
   const payloadInterval = useRef<number | null>(null);
 
-  // 🔍 1. Проверяем, есть ли уже кошельки у пользователя
   useEffect(() => {
     if (!authLoading && token) {
       fetch('/api/wallets', {
@@ -48,11 +46,6 @@ function MainPage() {
     }
   }, [authLoading, token, hasWallets, verified, router]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDelayedCheck(true), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
   const generateProofPayload = async () => {
     try {
       const payloadResponse = await fetch('/api/proof-payload', {
@@ -67,6 +60,7 @@ function MainPage() {
           state: 'ready',
           value: payloadData.data.payload
         });
+        setPayloadGenerated(payloadData.data.payload);
       } else {
         tonConnectUI.setConnectRequestParameters(null);
       }
@@ -150,14 +144,14 @@ function MainPage() {
 
           if (result.data.valid) {
             setVerified(true);
-            tonConnectUI.disconnect();
             router.replace('/wallet');
           } else {
             alert('Verification failed. Try another wallet.');
-            tonConnectUI.disconnect();
           }
         } catch (err) {
           console.error('Verification error:', err);
+        } finally {
+          tonConnectUI.disconnect();
         }
       };
 

@@ -18,15 +18,11 @@ import {
 
 interface BalancesResponse {
   code: number;
-  data: { balances: Array<{ token: string; sums: Record<'BALANCE' | 'USD' | 'TON' | 'RUB', number> }> };
+  data: { balances: Array<{ token: string; logo: string; sums: Record<'BALANCE' | 'USD' | 'TON' | 'RUB', number> }> };
 }
 interface RewardsResponse {
   code: number;
   data: { rewards: Array<{ token: string; amount: number }> };
-}
-interface ProofPayloadResponse {
-  code: number;
-  data: { payload: string; timestamp: number };
 }
 
 export default function WalletPage() {
@@ -34,11 +30,10 @@ export default function WalletPage() {
   const { t } = useTranslation();
   const { token, loading: authLoading } = useAuth();
   const { user } = useTelegram();
-  const [tonConnectUI] = useTonConnectUI();
-  const tonAddress = useTonAddress();
 
   const [tokens, setTokens] = useState<Array<{
     token: string;
+    logo: string;
     balance: number;
     usd: number;
     ton: number;
@@ -58,6 +53,7 @@ export default function WalletPage() {
       // Aggregate balances and rewards across all wallets
       const balMap = new Map<string, { balance: number; usd: number; rub: number; ton: number }>();
       const rewMap = new Map<string, number>();
+      const logoMap = new Map<string, string>();
 
       for (const w of wallets) {
         const [bRes, rRes] = await Promise.all([
@@ -79,6 +75,7 @@ export default function WalletPage() {
             rub: prev.rub + b.sums.RUB,
             ton: prev.ton + b.sums.TON
           });
+          logoMap.set(b.token, b.logo);
         });
         rewards.forEach(r => {
           rewMap.set(r.token, (rewMap.get(r.token) ?? 0) + r.amount);
@@ -88,6 +85,7 @@ export default function WalletPage() {
       setTokens(
         Array.from(balMap.entries()).map(([token, sums]) => ({
           token,
+          logo: logoMap.get(token) ?? "",
           balance: sums.balance,
           usd: sums.usd,
           ton: sums.ton,
@@ -158,7 +156,7 @@ export default function WalletPage() {
               </p>
             </div>
             <Image
-              src={`/token-${tok.token.toLowerCase()}.png`}
+              src={`${tok.logo}`}
               alt={tok.token}
               width={64}
               height={64}

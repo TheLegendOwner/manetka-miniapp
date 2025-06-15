@@ -42,7 +42,7 @@ export default function AccountPage() {
   };
 
   useEffect(() => {
-    if (!authLoading && !token) {
+    if ((!authLoading && !token) || wallets.length === 0) {
       router.replace('/');
     }
   }, [authLoading, token, router]);
