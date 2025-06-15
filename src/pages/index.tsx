@@ -145,7 +145,7 @@ function MainPage() {
           const result = await response.json();
           console.log('Verify response:', result);
 
-          if (result.status === 0 && result.data.valid) {
+          if (result.code === 0 && result.data.valid) {
             setVerified(true);
             router.replace({
               pathname: '/wallet',
