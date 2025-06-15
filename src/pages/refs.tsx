@@ -18,12 +18,15 @@ import {
   Share2
 } from 'lucide-react';
 import '../lib/i18n';
+import Image from "next/image";
 
 interface Referral {
   first_name: string;
   last_name: string;
   username: string;
-  rewards: string; // e.g. "1.23 TON"
+  avatar: string;
+  rewards_total: number;
+  rewards_unclaimed: number; // e.g. "1.23 TON"
 }
 
 export default function RefsPage() {
@@ -35,6 +38,8 @@ export default function RefsPage() {
 
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [referralLink, setReferralLink] = useState('');
+  const [rewardsTotal, setRewardsTotal] = useState<number>(0);
+  const [rewardsUnclaimed, setRewardsUnclaimed] = useState<number>(0);
 
   // Redirect if not authenticated or wallet not connected
   useEffect(() => {
@@ -57,6 +62,8 @@ export default function RefsPage() {
           // assume API returns { data: { referrals: Referral[] } }
           const list: Referral[] = json.data.referrals;
           setReferrals(list);
+          setRewardsTotal(json.data.rewards_total);
+          setRewardsUnclaimed(json.data.rewards_unclaimed);
         } catch (err) {
           console.error('Failed to fetch referrals', err);
         }
@@ -83,10 +90,6 @@ export default function RefsPage() {
     }
   };
 
-  const totalRewards = referrals
-    .reduce((sum, r) => sum + parseFloat(r.rewards), 0)
-    .toFixed(2);
-
   return (
     <div className="flex flex-col min-h-screen bg-[#F9FAFB] font-['Aboreto']">
       {/* Header */}
@@ -108,7 +111,11 @@ export default function RefsPage() {
           </div>
           <div className="flex justify-between text-sm font-medium">
             <span>{t('referral_share')}</span>
-            <span>{totalRewards} TON</span>
+            <span>{rewardsTotal.toFixed(2)} TON</span>
+          </div>
+          <div className="flex justify-between text-sm font-medium">
+            <span>{t('referral_unclaimed')}</span>
+            <span>{rewardsUnclaimed.toFixed(2)} TON</span>
           </div>
           <div className="text-xs text-gray-500">{t('your_referral_link')}</div>
           <div className="flex items-center gap-2 mt-1">
@@ -128,13 +135,23 @@ export default function RefsPage() {
         <div className="bg-white rounded-xl border divide-y divide-gray-100">
           {referrals.map((ref, i) => (
             <div key={i} className="flex justify-between items-center p-4">
+              <div className="w-[75px] h-[75px] rounded-full overflow-hidden border border-gray-300">
+                <Image
+                    src={ref.avatar}
+                    alt="avatar"
+                    width={30}
+                    height={30}
+                    unoptimized
+                />
+              </div>
               <div className="flex flex-col">
                 <span className="text-sm font-medium">
                   {ref.first_name} {ref.last_name}
                 </span>
                 <span className="text-xs text-gray-500">@{ref.username}</span>
               </div>
-              <span className="text-sm font-semibold">{ref.rewards}</span>
+              <div className="text-sm font-semibold">{ref.rewards_total.toFixed(2)} TON</div>
+              <div className="text-sm font-semibold">{ref.rewards_unclaimed.toFixed(2)} TON</div>
             </div>
           ))}
         </div>
