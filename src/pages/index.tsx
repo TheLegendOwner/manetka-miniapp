@@ -146,9 +146,11 @@ function MainPage() {
           console.log('Verify response:', result);
 
           if (result.status === 0 && result.data.valid) {
-            toast.success(t('wallet_added'));
             setVerified(true);
-            router.replace('/wallet');
+            router.replace({
+              pathname: '/wallet',
+              query: { verified: '1' }
+            });
           } else {
             toast.error(t('wallet_verification_failed'));
           }

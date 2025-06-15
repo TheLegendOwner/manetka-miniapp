@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useTelegram } from '../context/TelegramContext';
+import { toast } from 'react-toastify';
 import Image from 'next/image';
 import {
   Wallet as WalletIcon,
@@ -39,6 +40,12 @@ export default function WalletPage() {
     rewards: number;
   }>>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (router.query.verified === '1') {
+      toast.success(t('wallet_added'));
+    }
+  }, [router.query]);
 
    const fetchWalletsAndData = useCallback(async () => {
     if (!token) return;
