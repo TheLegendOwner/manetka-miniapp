@@ -7,6 +7,8 @@ import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import '../lib/i18n';
+import {toast} from "react-toastify";
+import {useTranslation} from "react-i18next";
 
 const payloadTTLMS = 1000 * 60 * 20;
 
@@ -14,6 +16,7 @@ function MainPage() {
   const [tonConnectUI] = useTonConnectUI();
   const wallet = useTonWallet();
   const router = useRouter();
+  const { t } = useTranslation();
   const { token, loading: authLoading } = useAuth();
 
   const [hasWallets, setHasWallets] = useState<boolean | null>(null);
@@ -144,6 +147,7 @@ function MainPage() {
 
           if (result.data.valid) {
             setVerified(true);
+            toast.success(t("wallet_added"), {position:"top-center"});
             router.replace('/wallet');
           } else {
             alert('Verification failed. Try another wallet.');

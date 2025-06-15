@@ -27,6 +27,7 @@ const resources = {
       disconnect: 'Disconnect',
       your_wallet_address: 'Your wallet address',
       no_wallet_connected: 'No wallet connected',
+      wallet_added: "Wallet successfully added",
       // …add any other keys you use…
     },
   },
@@ -53,6 +54,7 @@ const resources = {
       disconnect: 'Отключить',
       your_wallet_address: 'Ваш адрес кошелька',
       no_wallet_connected: 'Кошелек не подключен',
+      wallet_added: "Кошелек успешно добавлен",
       // …добавьте остальные ключи…
     },
   },
