@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'react-i18next';
-import { useTonAddress } from '@tonconnect/ui-react';
 import { useTelegram } from '../context/TelegramContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -34,7 +33,6 @@ export default function RefsPage() {
   const { t } = useTranslation();
   const { user, ready: tgReady } = useTelegram();
   const { token, loading: authLoading } = useAuth();
-  const tonAddress = useTonAddress();
 
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [referralLink, setReferralLink] = useState('');
@@ -43,14 +41,14 @@ export default function RefsPage() {
 
   // Redirect if not authenticated or wallet not connected
   useEffect(() => {
-    if (tgReady && (!token || !tonAddress)) {
+    if (tgReady && !token) {
       router.replace('/');
     }
-  }, [tgReady, token, tonAddress, router]);
+  }, [tgReady, token, router]);
 
   // Build referral link and fetch real referrals from API
   useEffect(() => {
-    if (tgReady && token && tonAddress && user) {
+    if (tgReady && token && user) {
       setReferralLink(`https://t.me/manetkawallet_bot/app?startapp=ref${user.id}`);
 
       (async () => {
@@ -69,9 +67,9 @@ export default function RefsPage() {
         }
       })();
     }
-  }, [tgReady, token, tonAddress, user]);
+  }, [tgReady, token, user]);
 
-  if (authLoading || !user || !tonAddress) {
+  if (authLoading || !user) {
     return null;
   }
 

@@ -4,7 +4,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'react-i18next';
-import { useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
 import { useTelegram } from '../context/TelegramContext';
 import { Wallet, Gamepad2, Image as ImageIcon, Users, Share2, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
@@ -22,17 +21,15 @@ export default function SocialPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const { user, ready } = useTelegram();
-  const [tonConnectUI] = useTonConnectUI();
-  const tonAddress = useTonAddress();
 
   // Redirect if not in Telegram WebApp or wallet not connected
   useEffect(() => {
-    if (ready && (!user || !tonAddress)) {
+    if (ready && (!user)) {
       router.replace('/');
     }
-  }, [ready, user, tonAddress]);
+  }, [ready, user]);
 
-  if (!ready || !user || !tonAddress) {
+  if (!ready || !user) {
     return null;
   }
 

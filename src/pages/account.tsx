@@ -4,7 +4,7 @@
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'react-i18next';
-import { useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
+import { useTonConnectUI } from '@tonconnect/ui-react';
 import {
   Wallet,
   Gamepad2,
@@ -24,7 +24,6 @@ export default function AccountPage() {
   const { t, i18n } = useTranslation();
   const { user, ready } = useTelegram();
   const [tonConnectUI] = useTonConnectUI();
-  const tonAddress = useTonAddress();
   const { token, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
 

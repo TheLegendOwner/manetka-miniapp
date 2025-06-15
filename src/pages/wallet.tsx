@@ -3,7 +3,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useTelegram } from '../context/TelegramContext';
