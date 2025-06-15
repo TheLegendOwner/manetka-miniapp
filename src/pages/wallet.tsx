@@ -156,7 +156,7 @@ export default function WalletPage() {
               </p>
             </div>
             <Image
-              src={`${tok.logo}`}
+              src={tok.logo}
               alt={tok.token}
               width={64}
               height={64}
