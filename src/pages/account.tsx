@@ -4,7 +4,7 @@
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'react-i18next';
-import { useTonConnectUI } from '@tonconnect/ui-react';
+import { useTonConnectUI, useTonWallet } from '@tonconnect/ui-react';
 import {
   Wallet,
   Gamepad2,
@@ -17,15 +17,22 @@ import { Address } from '@ton/core';
 import '../lib/i18n';
 import { useTelegram } from '../context/TelegramContext';
 import { useAuth } from '../context/AuthContext';
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
+import {toast} from "react-toastify";
 
 export default function AccountPage() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const { user, ready } = useTelegram();
   const [tonConnectUI] = useTonConnectUI();
+  const wallet = useTonWallet();
   const { token, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [payloadGenerated, setPayloadGenerated] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const payloadInterval = useRef<number | null>(null);
+
+  const payloadTTLMS = 1000 * 60 * 20;
 
   const [wallets, setWallets] = useState<Array<{
     wallet_id: string;
@@ -96,37 +103,120 @@ export default function AccountPage() {
     navigator.clipboard.writeText(address);
   };
 
-  const addWallet = async () => {
-    if (!token) return;
+  const generateProofPayload = async () => {
     try {
-      // 4) Запрос proof-payload с сервера
-      const ppRes = await fetch('/api/proof-payload', {
+      const payloadResponse = await fetch('/api/proof-payload', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const { data: { payload, timestamp } } = await ppRes.json();
 
-      // 5) Открыть модалку TonConnect и запросить подпись
-      const proof = await (tonConnectUI as any).requestProof({
-        payload,
-        timestamp
-      });
+      const payloadData = await payloadResponse.json();
+      console.log('Updated payload response:', payloadData);
 
-      // 6) Отправить proof на сервер для верификации
-      await fetch('/api/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ account: tonConnectUI.account, proof })
-      });
-
-      // 7) Перейти на страницу кошелька
-      router.push('/wallet');
+      if (payloadData?.data?.payload) {
+        tonConnectUI.setConnectRequestParameters({
+          state: 'ready',
+          value: payloadData.data.payload
+        });
+        setPayloadGenerated(payloadData.data.payload);
+      } else {
+        tonConnectUI.setConnectRequestParameters(null);
+      }
     } catch (err) {
-      console.error('Add wallet failed', err);
+      console.error('Failed to refresh proof payload', err);
+      tonConnectUI.setConnectRequestParameters(null);
     }
   };
+
+  const connectTonWallet = async () => {
+    if (!token) return;
+
+    try {
+      console.log('Opening wallet modal...');
+
+      const payloadResponse = await fetch('/api/proof-payload', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const payloadData = await payloadResponse.json();
+      console.log('Payload response:', payloadData);
+
+      if (payloadData?.data?.payload) {
+        tonConnectUI.setConnectRequestParameters({
+          state: 'ready',
+          value: { tonProof: payloadData.data.payload}
+        });
+      } else {
+        console.warn('No payload received');
+        tonConnectUI.setConnectRequestParameters(null);
+        return;
+      }
+
+      tonConnectUI.openModal();
+
+      if (payloadInterval.current !== null) {
+        clearInterval(payloadInterval.current);
+      }
+      payloadInterval.current = window.setInterval(() => {
+        console.log('Refreshing proof payload...');
+        generateProofPayload();
+      }, payloadTTLMS);
+
+    } catch (err) {
+      console.error('Connection error:', err);
+    }
+  };
+
+  useEffect(() => {
+    console.log('Wallet updated:', wallet);
+
+    if (
+        wallet?.account &&
+        wallet?.connectItems?.tonProof &&
+        'proof' in wallet.connectItems.tonProof &&
+        !verified
+    ) {
+      const verifyWallet = async () => {
+        try {
+          const tonProof = wallet.connectItems?.tonProof;
+
+          if (!tonProof || !('proof' in tonProof)) return;
+
+          const proof = tonProof.proof; // теперь тип безопасен
+          console.log('Verifying wallet...', proof);
+
+          const response = await fetch('/api/verify', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              account: wallet.account,
+              proof: proof,
+            }),
+          });
+
+          const result = await response.json();
+          console.log('Verify response:', result);
+
+          if (result.code === 0 && result.data.valid) {
+            setVerified(true);
+            toast.success(t('wallet_added'));
+            fetchWallets();
+          } else {
+            toast.error(t('wallet_verification_failed'));
+          }
+        } catch (err) {
+          console.error('Verification error:', err);
+          toast.error(t('wallet_verification_error'));
+        } finally {
+          tonConnectUI.disconnect();
+        }
+      };
+
+      verifyWallet();
+    }
+  }, [wallet, verified, token, router, tonConnectUI]);
 
   useEffect(() => {
     if (token) {
@@ -242,6 +332,13 @@ export default function AccountPage() {
               ))
           )}
         </div>
+
+        <button
+            onClick={connectTonWallet}
+            className="w-full bg-black text-white text-sm py-3 rounded-full uppercase"
+        >
+          {t('connect')}
+        </button>
       </div>
 
       {/* Bottom Nav */}
