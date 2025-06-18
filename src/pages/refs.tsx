@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import '../lib/i18n';
 import Image from "next/image";
-import { copyTextToClipboard, shareURL } from '@telegram-apps/sdk';
+import { init, copyTextToClipboard, shareURL } from '@telegram-apps/sdk';
 
 interface Referral {
   first_name: string;
@@ -74,16 +74,13 @@ export default function RefsPage() {
     return null;
   }
 
-  const shareReferral = () => {
-    // if (navigator.share) {
-    //   navigator.share({
-    //     title: 'Manetka',
-    //     text: `${t('join_manetka')}: ${referralLink}`,
-    //     url: referralLink
-    //   });
-    // } else {
+  const shareReferral = async () => {
+    try {
+      await init();
       shareURL(referralLink, `${t('join_manetka')}: ${referralLink}`);
-    // }
+    } catch (error) {
+      console.error('Error initializing Telegram SDK or sharing URL:', error);
+    }
   };
 
   return (
