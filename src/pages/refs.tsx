@@ -77,7 +77,7 @@ export default function RefsPage() {
   const shareReferral = async () => {
     try {
       await init();
-      shareURL(referralLink, `${t('join_manetka')}: ${referralLink}`);
+      shareURL(referralLink, t('join_manetka'));
     } catch (error) {
       console.error('Error initializing Telegram SDK or sharing URL:', error);
     }
