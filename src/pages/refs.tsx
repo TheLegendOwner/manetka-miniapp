@@ -18,7 +18,8 @@ import {
 } from 'lucide-react';
 import '../lib/i18n';
 import Image from "next/image";
-import { copyTextToClipboard,shareURL } from '@telegram-apps/sdk';
+import { copyTextToClipboard } from '@telegram-apps/sdk';
+import { initUtils} from '@tma.js/sdk';
 
 interface Referral {
   first_name: string;
@@ -39,6 +40,7 @@ export default function RefsPage() {
   const [referralLink, setReferralLink] = useState('');
   const [rewardsTotal, setRewardsTotal] = useState<number>(0);
   const [rewardsUnclaimed, setRewardsUnclaimed] = useState<number>(0);
+  const utils = initUtils();
 
   // Redirect if not authenticated or wallet not connected
   useEffect(() => {
@@ -75,16 +77,14 @@ export default function RefsPage() {
   }
 
   const shareReferral = () => {
-    if (shareURL.isAvailable()) {
-      shareURL(referralLink, `${t('join_manetka')}: ${referralLink}`)
-    } else if (navigator.share) {
+    if (navigator.share) {
       navigator.share({
         title: 'Manetka',
         text: `${t('join_manetka')}: ${referralLink}`,
         url: referralLink
       });
     } else {
-      alert(t('share_not_supported'));
+      utils.shareURL(referralLink, `${t('join_manetka')}: ${referralLink}`);
     }
   };
 
