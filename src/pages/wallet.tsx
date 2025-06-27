@@ -165,16 +165,14 @@ export default function WalletPage() {
                 {t('rewards')}: {tok.rewards.toFixed(4)} TON
               </p>
             </div>
-            <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
-              <button
+            <button
                   onClick={() => {
                     window.open(tok.url, '_blank');
                   }}
-                  className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] disabled:opacity-50 text-gray-900 font-semibold text-base rounded-full shadow-md"
+                  className="w-[150px] h-[32px] bg-[#EBB923] hover:bg-[#e2aa14] disabled:opacity-50 text-gray-900 font-semibold text-base rounded-full shadow-md"
               >
                 {t('trade_button')}
-              </button>
-            </div>
+            </button>
             <Image
               src={tok.logo}
               alt={tok.token}
