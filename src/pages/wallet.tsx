@@ -144,44 +144,50 @@ export default function WalletPage() {
             </div>
           </div>
       {/* Tokens */}
-      <div className="flex-1 px-4 pt-4 pb-24 space-y-4">
-        {tokens.map(tok => (
-          <div
-            key={tok.token}
-            className="flex justify-between items-center bg-white border rounded-2xl px-4 py-3 shadow-sm"
-          >
-            <div>
-              <p className="font-bold text-lg">{tok.token}</p>
-              <p className="text-sm text-gray-500">
-                {t('balance')}: {tok.balance.toFixed(4)}
-              </p>
-              <p className="text-sm text-gray-500">
-                {t('balance_usd')}: ${tok.usd.toFixed(2)}
-              </p>
-              <p className="text-sm text-gray-500">
-                {t('balance_ton')}: {tok.ton.toFixed(4)} TON
-              </p>
-              <p className="text-sm text-green-600 font-semibold">
-                {t('rewards')}: {tok.rewards.toFixed(4)} TON
-              </p>
-            </div>
-            <button
-                  onClick={() => {
-                    window.open(tok.url, '_blank');
-                  }}
-                  className="w-[150px] h-[32px] bg-[#EBB923] hover:bg-[#e2aa14] disabled:opacity-50 text-gray-900 font-semibold text-base rounded-full shadow-md"
+        <div className="flex-1 px-4 pt-4 pb-24 space-y-4">
+          {tokens.map(tok => (
+              <div
+                  key={tok.token}
+                  className="flex flex-col justify-between bg-white border rounded-2xl px-4 py-3 shadow-sm space-y-4"
               >
-                {t('trade_button')}
-            </button>
-            <Image
-              src={tok.logo}
-              alt={tok.token}
-              width={64}
-              height={64}
-            />
-          </div>
-        ))}
-      </div>
+                {/* Баланс + Лого в линию */}
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-lg">{tok.token}</p>
+                    <p className="text-sm text-gray-500">
+                      {t('balance')}: {tok.balance.toFixed(4)}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {t('balance_usd')}: ${tok.usd.toFixed(2)}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {t('balance_ton')}: {tok.ton.toFixed(4)} TON
+                    </p>
+                    <p className="text-sm text-green-600 font-semibold">
+                      {t('rewards')}: {tok.rewards.toFixed(4)} TON
+                    </p>
+                  </div>
+
+                  <Image
+                      src={tok.logo}
+                      alt={tok.token}
+                      width={64}
+                      height={64}
+                  />
+                </div>
+
+                {/* Кнопка внизу */}
+                <button
+                    onClick={() => {
+                      window.open(tok.url, '_blank');
+                    }}
+                    className="w-full h-[40px] bg-[#EBB923] hover:bg-[#e2aa14] disabled:opacity-50 text-gray-900 font-semibold text-base rounded-full shadow-md"
+                >
+                  {t('trade_button')}
+                </button>
+              </div>
+          ))}
+        </div>
       {/* Bottom Nav */}
       <div className="fixed bottom-0 inset-x-0 border-t bg-white py-2 px-4 flex justify-between">
         <button
