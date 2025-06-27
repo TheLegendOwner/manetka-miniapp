@@ -18,7 +18,7 @@ import {
 
 interface BalancesResponse {
   code: number;
-  data: { balances: Array<{ token: string; logo: string; sums: Record<'BALANCE' | 'USD' | 'TON' | 'RUB', number> }> };
+  data: { balances: Array<{ token: string; logo: string; url: string; sums: Record<'BALANCE' | 'USD' | 'TON' | 'RUB', number> }> };
 }
 interface RewardsResponse {
   code: number;
@@ -34,6 +34,7 @@ export default function WalletPage() {
   const [tokens, setTokens] = useState<Array<{
     token: string;
     logo: string;
+    url: string;
     balance: number;
     usd: number;
     ton: number;
@@ -60,6 +61,7 @@ export default function WalletPage() {
       const balMap = new Map<string, { balance: number; usd: number; rub: number; ton: number }>();
       const rewMap = new Map<string, number>();
       const logoMap = new Map<string, string>();
+      const urlMap = new Map<string, string>();
 
       for (const w of wallets) {
         const [bRes, rRes] = await Promise.all([
@@ -82,6 +84,7 @@ export default function WalletPage() {
             ton: prev.ton + b.sums.TON
           });
           logoMap.set(b.token, b.logo);
+          urlMap.set(b.token, b.url);
         });
         rewards.forEach(r => {
           rewMap.set(r.token, (rewMap.get(r.token) ?? 0) + r.amount);
@@ -92,6 +95,7 @@ export default function WalletPage() {
         Array.from(balMap.entries()).map(([token, sums]) => ({
           token,
           logo: logoMap.get(token) ?? "",
+          url: urlMap.get(token) ?? "",
           balance: sums.balance,
           usd: sums.usd,
           ton: sums.ton,
@@ -160,6 +164,16 @@ export default function WalletPage() {
               <p className="text-sm text-green-600 font-semibold">
                 {t('rewards')}: {tok.rewards.toFixed(4)} TON
               </p>
+            </div>
+            <div className="absolute bottom-[clamp(50px,20%,120px)] w-full flex justify-center">
+              <button
+                  onClick={() => {
+                    window.open(tok.url, '_blank');
+                  }}
+                  className="w-[350px] h-[52px] bg-[#EBB923] hover:bg-[#e2aa14] disabled:opacity-50 text-gray-900 font-semibold text-base rounded-full shadow-md"
+              >
+                {t('trade_button')}
+              </button>
             </div>
             <Image
               src={tok.logo}

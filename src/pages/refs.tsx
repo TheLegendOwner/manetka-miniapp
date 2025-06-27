@@ -39,6 +39,7 @@ export default function RefsPage() {
   const [referralLink, setReferralLink] = useState('');
   const [rewardsTotal, setRewardsTotal] = useState<number>(0);
   const [rewardsUnclaimed, setRewardsUnclaimed] = useState<number>(0);
+  const [bonus] = useState<number>(0);
 
   // Redirect if not authenticated or wallet not connected
   useEffect(() => {
@@ -63,6 +64,7 @@ export default function RefsPage() {
           setReferrals(list);
           setRewardsTotal(json.data.rewards_total);
           setRewardsUnclaimed(json.data.rewards_unclaimed);
+
         } catch (err) {
           console.error('Failed to fetch referrals', err);
         }
@@ -108,6 +110,10 @@ export default function RefsPage() {
           </div>
           <div className="flex justify-between text-sm font-medium">
             <span>{t('referral_unclaimed')}</span>
+            <span>{rewardsUnclaimed.toFixed(2)} TON</span>
+          </div>
+          <div className="flex justify-between text-sm font-medium">
+            <span>{t('referral_bonus')}</span>
             <span>{rewardsUnclaimed.toFixed(2)} TON</span>
           </div>
           <div className="text-xs text-gray-500">{t('your_referral_link')}</div>

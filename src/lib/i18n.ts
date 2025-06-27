@@ -30,6 +30,7 @@ const resources = {
       wallet_added: "Wallet successfully added",
       wallet_verification_failed: "Verification failed. Try another wallet.",
       wallet_verification_error: "Unknown error. Contact the developer.",
+      trade_button: "Trade token",
       // …add any other keys you use…
     },
   },
@@ -59,6 +60,7 @@ const resources = {
       wallet_added: "Кошелек успешно добавлен",
       wallet_verification_failed: "Ошибка верификации. Попробуйте другой кошелёк.",
       wallet_verification_error: "Неизвестная ошибка. Обратитесь к разработчику.",
+      trade_button: "Торговать токеном",
       // …добавьте остальные ключи…
     },
   },
