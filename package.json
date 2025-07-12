@@ -10,6 +10,7 @@
   "dependencies": {
     "@radix-ui/react-select": "^2.2.5",
     "@stomp/stompjs": "^7.1.1",
+    "@tailwindcss/cli": "^4.1.11",
     "@telegram-apps/sdk": "^3.10.1",
     "@tma.js/sdk": "^2.7.0",
     "@ton/core": "^0.60.1",

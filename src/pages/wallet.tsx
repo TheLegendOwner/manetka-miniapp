@@ -36,7 +36,7 @@ interface Wallet {
   address: string;
   main: boolean;
   connected_at: string;
-};
+}
 
 export default function WalletPage() {
   const router = useRouter();
@@ -75,7 +75,7 @@ export default function WalletPage() {
 
       setWallets(wallets.map((w: Wallet & { address?: string }) => ({
         ...w,
-        label: w.address || w.wallet_id.slice(0, 6) + '...'
+        address: w.address.slice(0, 6) + '...' + w.address.slice(w.address.length-7, w.address.length-1)
       })));
 
       const walletsToProcess = selectedWalletId === 'all'
@@ -177,7 +177,7 @@ export default function WalletPage() {
             <SelectTrigger className="w-full mb-2">
               <SelectValue placeholder={t('select_wallet')} />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-50 bg-white rounded-md shadow-lg">
               <SelectItem value="all">{t('all_wallets')}</SelectItem>
               {wallets.map(w => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
