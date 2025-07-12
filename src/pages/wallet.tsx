@@ -171,7 +171,7 @@ export default function WalletPage() {
         </div>
 
         {/* Wallet Select + Tokens */}
-        <div className="flex-1 px-4 pt-4 pb-24 space-y-4">
+        <div className="flex flex-col justify-between bg-white border rounded-2xl px-4 py-3 shadow-sm pt-4 pb-24 space-y-4">
           {/* Select wallet */}
           <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
             <SelectTrigger className="w-full mb-2">
