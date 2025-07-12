@@ -1,4 +1,3 @@
-// src/pages/wallet.tsx (full updated code)
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -15,6 +14,13 @@ import {
   Users,
   Share2
 } from 'lucide-react';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from "@/components/ui/select";
 
 interface BalancesResponse {
   code: number;
@@ -24,6 +30,13 @@ interface RewardsResponse {
   code: number;
   data: { rewards: Array<{ token: string; amount: number }> };
 }
+
+interface Wallet {
+  wallet_id: string;
+  address: string;
+  main: boolean;
+  connected_at: string;
+};
 
 export default function WalletPage() {
   const router = useRouter();
@@ -40,6 +53,9 @@ export default function WalletPage() {
     ton: number;
     rewards: number;
   }>>([]);
+
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [selectedWalletId, setSelectedWalletId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,7 +64,7 @@ export default function WalletPage() {
     }
   }, [router.query]);
 
-   const fetchWalletsAndData = useCallback(async () => {
+  const fetchWalletsAndData = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
@@ -57,13 +73,21 @@ export default function WalletPage() {
       });
       const { data: { wallets } } = await wRes.json();
 
-      // Aggregate balances and rewards across all wallets
+      setWallets(wallets.map((w: Wallet & { address?: string }) => ({
+        ...w,
+        label: w.address || w.wallet_id.slice(0, 6) + '...'
+      })));
+
+      const walletsToProcess = selectedWalletId === 'all'
+          ? wallets
+          : wallets.filter((w: Wallet) => w.wallet_id === selectedWalletId);
+
       const balMap = new Map<string, { balance: number; usd: number; rub: number; ton: number }>();
       const rewMap = new Map<string, number>();
       const logoMap = new Map<string, string>();
       const urlMap = new Map<string, string>();
 
-      for (const w of wallets) {
+      for (const w of walletsToProcess) {
         const [bRes, rRes] = await Promise.all([
           fetch(`/api/balances/${w.wallet_id}`, {
             headers: { Authorization: `Bearer ${token}` }
@@ -72,6 +96,7 @@ export default function WalletPage() {
             headers: { Authorization: `Bearer ${token}` }
           })
         ]);
+
         const { data: { balances } }: BalancesResponse = await bRes.json();
         const { data: { rewards } }: RewardsResponse = await rRes.json();
 
@@ -86,28 +111,29 @@ export default function WalletPage() {
           logoMap.set(b.token, b.logo);
           urlMap.set(b.token, b.url);
         });
+
         rewards.forEach(r => {
           rewMap.set(r.token, (rewMap.get(r.token) ?? 0) + r.amount);
         });
       }
 
       setTokens(
-        Array.from(balMap.entries()).map(([token, sums]) => ({
-          token,
-          logo: logoMap.get(token) ?? "",
-          url: urlMap.get(token) ?? "",
-          balance: sums.balance,
-          usd: sums.usd,
-          ton: sums.ton,
-          rewards: rewMap.get(token) ?? 0
-        }))
+          Array.from(balMap.entries()).map(([token, sums]) => ({
+            token,
+            logo: logoMap.get(token) ?? "",
+            url: urlMap.get(token) ?? "",
+            balance: sums.balance,
+            usd: sums.usd,
+            ton: sums.ton,
+            rewards: rewMap.get(token) ?? 0
+          }))
       );
     } catch (e) {
       console.error('Fetch wallet data failed', e);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, selectedWalletId]);
 
   useEffect(() => {
     if (!authLoading && !token) {
@@ -119,7 +145,7 @@ export default function WalletPage() {
     if (token) {
       fetchWalletsAndData();
     }
-  }, [token, fetchWalletsAndData]);
+  }, [token, selectedWalletId, fetchWalletsAndData]);
 
   if (authLoading || loading) {
     return <p className="p-4 text-center">Loading…</p>;
@@ -128,29 +154,45 @@ export default function WalletPage() {
   return (
       <div className="flex flex-col min-h-screen bg-[#F9FAFB] font-['Aboreto']">
         {/* Header */}
-          <div className="flex justify-between items-center px-5 py-4 border-b bg-white">
-            <h1 className="text-lg font-semibold uppercase">{t('token_assets')}</h1>
-            <div
-                className="w-9 h-9 rounded-full overflow-hidden cursor-pointer"
-                onClick={() => router.push('/account')}
-            >
-              <Image
-                  src={user?.photo_url || '/icons/avatar-default.svg'}
-                  alt="avatar"
-                  width={36}
-                  height={36}
-                  unoptimized
-              />
-            </div>
+        <div className="flex justify-between items-center px-5 py-4 border-b bg-white">
+          <h1 className="text-lg font-semibold uppercase">{t('token_assets')}</h1>
+          <div
+              className="w-9 h-9 rounded-full overflow-hidden cursor-pointer"
+              onClick={() => router.push('/account')}
+          >
+            <Image
+                src={user?.photo_url || '/icons/avatar-default.svg'}
+                alt="avatar"
+                width={36}
+                height={36}
+                unoptimized
+            />
           </div>
-      {/* Tokens */}
+        </div>
+
+        {/* Wallet Select + Tokens */}
         <div className="flex-1 px-4 pt-4 pb-24 space-y-4">
+          {/* Select wallet */}
+          <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
+            <SelectTrigger className="w-full mb-2">
+              <SelectValue placeholder={t('select_wallet')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('all_wallets')}</SelectItem>
+              {wallets.map(w => (
+                  <SelectItem key={w.wallet_id} value={w.wallet_id}>
+                    {w.address}
+                  </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Token cards */}
           {tokens.map(tok => (
               <div
                   key={tok.token}
                   className="flex flex-col justify-between bg-white border rounded-2xl px-4 py-3 shadow-sm space-y-4"
               >
-                {/* Баланс + Лого в линию */}
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="font-bold text-lg">{tok.token}</p>
@@ -167,59 +209,41 @@ export default function WalletPage() {
                       {t('rewards')}: {tok.rewards.toFixed(4)} TON
                     </p>
                   </div>
-
-                  <Image
-                      src={tok.logo}
-                      alt={tok.token}
-                      width={64}
-                      height={64}
-                  />
+                  <Image src={tok.logo} alt={tok.token} width={64} height={64} />
                 </div>
-
-                {/* Кнопка внизу */}
                 <button
-                    onClick={() => {
-                      window.open(tok.url, '_blank');
-                    }}
-                    className="w-full h-[40px] bg-[#EBB923] hover:bg-[#e2aa14] disabled:opacity-50 text-gray-900 font-semibold text-base rounded-full shadow-md"
+                    onClick={() => window.open(tok.url, '_blank')}
+                    className="w-full h-[40px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md"
                 >
                   {t('trade_button')}
                 </button>
               </div>
           ))}
         </div>
-      {/* Bottom Nav */}
-      <div className="fixed bottom-0 inset-x-0 border-t bg-white py-2 px-4 flex justify-between">
-        <button
-          onClick={() => router.push('/wallet')}
-          className="w-1/5 flex flex-col items-center text-[#EBB923]"
-        >
-          <WalletIcon size={24} />
-          <span className="text-xs">{t('wallet')}</span>
-        </button>
-        <div className="w-1/5 flex flex-col items-center text-gray-300 cursor-not-allowed">
-          <Gamepad2 size={24} />
-          <span className="text-xs">{t('games')}</span>
+
+        {/* Bottom Nav */}
+        <div className="fixed bottom-0 inset-x-0 border-t bg-white py-2 px-4 flex justify-between">
+          <button onClick={() => router.push('/wallet')} className="w-1/5 flex flex-col items-center text-[#EBB923]">
+            <WalletIcon size={24} />
+            <span className="text-xs">{t('wallet')}</span>
+          </button>
+          <div className="w-1/5 flex flex-col items-center text-gray-300 cursor-not-allowed">
+            <Gamepad2 size={24} />
+            <span className="text-xs">{t('games')}</span>
+          </div>
+          <div className="w-1/5 flex flex-col items-center text-gray-300 cursor-not-allowed">
+            <ImageIcon size={24} />
+            <span className="text-xs">{t('nfts')}</span>
+          </div>
+          <button onClick={() => router.push('/social')} className="w-1/5 flex flex-col items-center text-gray-500">
+            <Share2 size={24} />
+            <span className="text-xs">{t('social')}</span>
+          </button>
+          <button onClick={() => router.push('/refs')} className="w-1/5 flex flex-col	items-center text-gray-500">
+            <Users size={24} />
+            <span className="text-xs">{t('refs')}</span>
+          </button>
         </div>
-        <div className="w-1/5 flex flex-col items-center text-gray-300 cursor-not-allowed">
-          <ImageIcon size={24} />
-          <span className="text-xs">{t('nfts')}</span>
-        </div>
-        <button
-          onClick={() => router.push('/social')}
-          className="w-1/5 flex flex-col items-center text-gray-500"
-        >
-          <Share2 size={24} />
-          <span className="text-xs">{t('social')}</span>
-        </button>
-        <button
-          onClick={() => router.push('/refs')}
-          className="w-1/5 flex flex-col	items-center text-gray-500"
-        >
-          <Users size={24} />
-          <span className="text-xs">{t('refs')}</span>
-        </button>
       </div>
-    </div>
   );
 }
