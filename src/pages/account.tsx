@@ -173,7 +173,7 @@ export default function AccountPage() {
       });
 
       const json = await res.json();
-      if (json.data.success) {
+      if (json.data.updated) {
         toast.success(t('wallet_set_main_success'));
         fetchWallets();
       } else {
