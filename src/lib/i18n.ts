@@ -35,7 +35,14 @@ const resources = {
       set_as_main: "Set as Main Wallet",
       wallet_set_main_success: "Wallet set as main",
       wallet_set_main_failed: "Failed to set wallet as main",
-      wallet_set_main_error: "Error setting main wallet"
+      wallet_set_main_error: "Error setting main wallet",
+      balances: "Balances",
+      statistics: "Statistics",
+      from: "From",
+      to: "To",
+      token: "Token",
+      reward_ton: "Reward (TON)",
+      total: "Summary"
       // …add any other keys you use…
     },
   },
@@ -70,7 +77,14 @@ const resources = {
       set_as_main: "Установить основным кошельком",
       wallet_set_main_success: "Кошелек установлен в качестве основного",
       wallet_set_main_failed: "Не удалось сделать кошелек основным",
-      wallet_set_main_error: "Ошибка установки кошелька основным"
+      wallet_set_main_error: "Ошибка установки кошелька основным",
+      balances: "Балансы",
+      statistics: "Статистика",
+      from: "От",
+      to: "До",
+      token: "Токен",
+      reward_ton: "Доход (TON)",
+      total: "Итого"
       // …добавьте остальные ключи…
     },
   },

@@ -21,6 +21,9 @@ import {
   SelectContent,
   SelectItem
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 interface BalancesResponse {
   code: number;
@@ -57,6 +60,10 @@ export default function WalletPage() {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [selectedWalletId, setSelectedWalletId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('balances');
+  const [fromDate, setFromDate] = useState<Date | null>(null);
+  const [toDate, setToDate] = useState<Date | null>(null);
+  const [rewardsStats, setRewardsStats] = useState<Array<{ token: string; amount: number }>>([]);
 
   useEffect(() => {
     if (router.query.verified === '1') {
@@ -135,11 +142,53 @@ export default function WalletPage() {
     }
   }, [token, selectedWalletId]);
 
+  const fetchRewardsStats = useCallback(async () => {
+    if (!token) return;
+    try {
+      const formatDate = (date: Date) => format(date, 'yyyy-MM-dd');
+      const from = fromDate ? formatDate(fromDate) : null;
+      const to = toDate ? formatDate(toDate) : null;
+
+      const walletsToProcess = selectedWalletId === 'all'
+          ? wallets
+          : wallets.filter((w: Wallet) => w.wallet_id === selectedWalletId);
+
+      const totalRewards = new Map<string, number>();
+
+      for (const w of walletsToProcess) {
+        let endpoint = `/api/rewards/${w.wallet_id}`;
+        if (from && to) {
+          endpoint = `/api/rewards/${w.wallet_id}/between/${from}/${to}`;
+        }
+
+        const res = await fetch(endpoint, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const { data: { rewards } }: RewardsResponse = await res.json();
+
+        rewards.forEach(r => {
+          totalRewards.set(r.token, (totalRewards.get(r.token) ?? 0) + r.amount);
+        });
+      }
+
+      const result = Array.from(totalRewards.entries()).map(([token, amount]) => ({ token, amount }));
+      setRewardsStats(result);
+    } catch (e) {
+      console.error('Failed to fetch reward stats', e);
+    }
+  }, [token, wallets, selectedWalletId, fromDate, toDate]);
+
   useEffect(() => {
     if (!authLoading && !token) {
       router.replace('/');
     }
   }, [authLoading, token, router]);
+
+  useEffect(() => {
+    if (activeTab === 'stats') {
+      fetchRewardsStats();
+    }
+  }, [activeTab, fromDate, toDate, fetchRewardsStats]);
 
   useEffect(() => {
     if (token) {
@@ -188,37 +237,88 @@ export default function WalletPage() {
           </Select>
 
           {/* Token cards */}
-          {tokens.map(tok => (
-              <div
-                  key={tok.token}
-                  className="flex flex-col justify-between bg-white border rounded-2xl px-4 py-3 shadow-sm space-y-4"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-bold text-lg">{tok.token}</p>
-                    <p className="text-sm text-gray-500">
-                      {t('balance')}: {tok.balance.toFixed(4)}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {t('balance_usd')}: ${tok.usd.toFixed(2)}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {t('balance_ton')}: {tok.ton.toFixed(4)} TON
-                    </p>
-                    <p className="text-sm text-green-600 font-semibold">
-                      {t('rewards')}: {tok.rewards.toFixed(4)} TON
-                    </p>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="w-full grid grid-cols-2 mb-4">
+              <TabsTrigger value="balances">{t('balances')}</TabsTrigger>
+              <TabsTrigger value="stats">{t('statistics')}</TabsTrigger>
+            </TabsList>
+
+            {/* BALANCES */}
+            <TabsContent value="balances">
+              {tokens.map(tok => (
+                  <div
+                      key={tok.token}
+                      className="flex flex-col justify-between bg-white border rounded-2xl px-4 py-3 shadow-sm space-y-4 mb-3"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold text-lg">{tok.token}</p>
+                        <p className="text-sm text-gray-500">{t('balance')}: {tok.balance.toFixed(4)}</p>
+                        <p className="text-sm text-gray-500">{t('balance_usd')}: ${tok.usd.toFixed(2)}</p>
+                        <p className="text-sm text-gray-500">{t('balance_ton')}: {tok.ton.toFixed(4)} TON</p>
+                        <p className="text-sm text-green-600 font-semibold">{t('rewards')}: {tok.rewards.toFixed(4)} TON</p>
+                      </div>
+                      <Image src={tok.logo} alt={tok.token} width={64} height={64} />
+                    </div>
+                    <button
+                        onClick={() => window.open(tok.url, '_blank')}
+                        className="w-full h-[40px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md"
+                    >
+                      {t('trade_button')}
+                    </button>
                   </div>
-                  <Image src={tok.logo} alt={tok.token} width={64} height={64} />
+              ))}
+            </TabsContent>
+
+            {/* STATS */}
+            <TabsContent value="stats" className="space-y-4">
+              {/* Date Filters */}
+              <div className="flex gap-4 justify-between">
+                <div className="flex flex-col space-y-1">
+                  <label className="text-sm text-gray-600">{t('from')}</label>
+                  <Calendar
+                      mode="single"
+                      selected={fromDate ?? undefined}
+                      onSelect={(date) => setFromDate(date ?? null)}
+                  />
                 </div>
-                <button
-                    onClick={() => window.open(tok.url, '_blank')}
-                    className="w-full h-[40px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md"
-                >
-                  {t('trade_button')}
-                </button>
+                <div className="flex flex-col space-y-1">
+                  <label className="text-sm text-gray-600">{t('to')}</label>
+                  <Calendar
+                      mode="single"
+                      selected={toDate ?? undefined}
+                      onSelect={(date) => setToDate(date ?? null)}
+                  />
+                </div>
               </div>
-          ))}
+
+              {/* Rewards Table */}
+              <div className="overflow-x-auto border rounded-xl">
+                <table className="min-w-full text-sm text-left">
+                  <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-4 py-2">{t('token')}</th>
+                    <th className="px-4 py-2">{t('reward_ton')}</th>
+                  </tr>
+                  </thead>
+                  <tbody>
+                  {rewardsStats.map(r => (
+                      <tr key={r.token}>
+                        <td className="px-4 py-2 font-medium">{r.token}</td>
+                        <td className="px-4 py-2">{r.amount.toFixed(4)} TON</td>
+                      </tr>
+                  ))}
+                  <tr className="font-bold bg-gray-50">
+                    <td className="px-4 py-2">{t('total')}</td>
+                    <td className="px-4 py-2">
+                      {rewardsStats.reduce((acc, r) => acc + r.amount, 0).toFixed(4)} TON
+                    </td>
+                  </tr>
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Bottom Nav */}
