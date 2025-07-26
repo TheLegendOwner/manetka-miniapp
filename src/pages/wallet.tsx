@@ -288,7 +288,7 @@ export default function WalletPage() {
                         {fromDate ? format(fromDate, 'yyyy-MM-dd') : t('pick_date')}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto p-0 z-50" align="start">
                       <Calendar
                           mode="single"
                           selected={fromDate ?? undefined}
@@ -311,7 +311,7 @@ export default function WalletPage() {
                         {toDate ? format(toDate, 'yyyy-MM-dd') : t('pick_date')}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto p-0 z-50" align="start">
                       <Calendar
                           mode="single"
                           selected={toDate ?? undefined}
@@ -320,6 +320,12 @@ export default function WalletPage() {
                     </PopoverContent>
                   </Popover>
                 </div>
+                <button
+                    onClick={fetchRewardsStats}
+                    className="mt-2 bg-[#EBB923] text-black rounded-full px-4 py-2 font-semibold text-sm"
+                >
+                  {t('apply_filter')}
+                </button>
               </div>
 
               {/* Rewards Table */}
