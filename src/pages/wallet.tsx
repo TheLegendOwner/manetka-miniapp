@@ -84,7 +84,7 @@ export default function WalletPage() {
 
       setWallets(wallets.map((w: Wallet & { address?: string }) => ({
         ...w,
-        address: w.address.slice(0, 6) + '...' + w.address.slice(w.address.length-7, w.address.length-1)
+        address: w.address.slice(0, 6) + '......' + w.address.slice(w.address.length-7, w.address.length-1)
       })));
 
       const walletsToProcess = selectedWalletId === 'all'
@@ -288,7 +288,10 @@ export default function WalletPage() {
                         {fromDate ? format(fromDate, 'yyyy-MM-dd') : t('pick_date')}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-100" align="start">
+                    <PopoverContent className="w-auto p-0 z-[9999] bg-white shadow-xl border border-gray-200 rounded-md"
+                                    align="start"
+                                    sideOffset={4}
+                    >
                       <Calendar
                           mode="single"
                           selected={fromDate ?? undefined}
@@ -310,7 +313,10 @@ export default function WalletPage() {
                         {toDate ? format(toDate, 'yyyy-MM-dd') : t('pick_date')}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-100" align="start">
+                    <PopoverContent className="w-auto p-0 z-[9999] bg-white shadow-xl border border-gray-200 rounded-md"
+                                      align="start"
+                                      sideOffset={4}
+                    >
                       <Calendar
                           mode="single"
                           selected={toDate ?? undefined}
@@ -320,12 +326,6 @@ export default function WalletPage() {
                   </Popover>
                 </div>
               </div>
-              <button
-                  onClick={fetchRewardsStats}
-                  className="mt-2 bg-[#EBB923] text-black rounded-full px-4 py-2 font-semibold text-sm"
-              >
-                {t('apply_filter')}
-              </button>
 
               {/* Rewards Table */}
               <div className="overflow-x-auto border rounded-xl">
