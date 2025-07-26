@@ -11,7 +11,7 @@ import {
   Image as ImageIcon,
   Users,
   Share2,
-  ArrowLeft, Copy, Trash2
+  ArrowLeft, Copy, Trash2, Star
 } from 'lucide-react';
 import '../lib/i18n';
 import { useTelegram } from '../context/TelegramContext';
@@ -162,6 +162,29 @@ export default function AccountPage() {
     }
   };
 
+  const setMainWallet = async (wallet_id: string) => {
+    try {
+      const res = await fetch(`/api/wallets/${wallet_id}/set_main`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const json = await res.json();
+      if (json.data.success) {
+        toast.success(t('wallet_set_main_success'));
+        fetchWallets();
+      } else {
+        toast.error(t('wallet_set_main_failed'));
+      }
+    } catch (error) {
+      console.error('Set main wallet error:', error);
+      toast.error(t('wallet_set_main_error'));
+    }
+  };
+
   useEffect(() => {
     console.log('Wallet updated:', wallet);
 
@@ -306,14 +329,25 @@ export default function AccountPage() {
                       key={wallet.wallet_id}
                       className="bg-white p-4 rounded-lg border border-gray-200 flex items-center justify-between mt-2"
                   >
-                    <div className="flex flex-col">
-                      <p className="text-[14px] text-[#171A1F] break-all">
-                        {wallet.address}
-                      </p>
-                      {wallet.main && (
-                          // <span className="text-xs text-green-600 mt-1">{t('main_wallet')}</span>
-                        <span className="text-xs text-green-600 mt-1">MAIN</span>
-                      )}
+                    <div className="flex items-center gap-3">
+                      <button
+                          onClick={() => setMainWallet(wallet.wallet_id)}
+                          disabled={wallet.main}
+                          className={`transition ${
+                              wallet.main ? 'text-yellow-500' : 'text-gray-400 hover:text-yellow-400'
+                          }`}
+                          title={wallet.main ? t('main_wallet') : t('set_as_main')}
+                      >
+                        <Star size={20} />
+                      </button>
+                      <div className="flex flex-col">
+                        <p className="text-[14px] text-[#171A1F] break-all">
+                          {wallet.address}
+                        </p>
+                        {wallet.main && (
+                          <span className="text-xs text-green-600 mt-1">{t('main_wallet')}</span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center space-x-4">

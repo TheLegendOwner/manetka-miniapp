@@ -31,6 +31,11 @@ const resources = {
       wallet_verification_failed: "Verification failed. Try another wallet.",
       wallet_verification_error: "Unknown error. Contact the developer.",
       trade_button: "Trade token",
+      main_wallet: "Main Wallet",
+      set_as_main: "Set as Main Wallet",
+      wallet_set_main_success: "Wallet set as main",
+      wallet_set_main_failed: "Failed to set wallet as main",
+      wallet_set_main_error: "Error setting main wallet"
       // …add any other keys you use…
     },
   },
@@ -61,6 +66,11 @@ const resources = {
       wallet_verification_failed: "Ошибка верификации. Попробуйте другой кошелёк.",
       wallet_verification_error: "Неизвестная ошибка. Обратитесь к разработчику.",
       trade_button: "Торговать токеном",
+      main_wallet: "Основной кошелек",
+      set_as_main: "Установить основным кошельком",
+      wallet_set_main_success: "Кошелек установлен в качестве основного",
+      wallet_set_main_failed: "Не удалось сделать кошелек основным",
+      wallet_set_main_error: "Ошибка установки кошелька основным"
       // …добавьте остальные ключи…
     },
   },
