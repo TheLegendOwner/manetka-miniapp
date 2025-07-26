@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 
 interface BalancesResponse {
@@ -273,22 +275,50 @@ export default function WalletPage() {
             {/* STATS */}
             <TabsContent value="stats" className="space-y-4">
               {/* Date Filters */}
-              <div className="flex gap-4 justify-between">
+              <div className="flex gap-4">
+                {/* FROM DATE */}
                 <div className="flex flex-col space-y-1">
                   <label className="text-sm text-gray-600">{t('from')}</label>
-                  <Calendar
-                      mode="single"
-                      selected={fromDate ?? undefined}
-                      onSelect={(date) => setFromDate(date ?? null)}
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                          variant="outline"
+                          className="w-[150px] justify-start text-left font-normal"
+                      >
+                        {fromDate ? format(fromDate, 'yyyy-MM-dd') : t('pick_date')}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                          mode="single"
+                          selected={fromDate ?? undefined}
+                          onSelect={(date) => setFromDate(date ?? null)}
+                          initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
+
+                {/* TO DATE */}
                 <div className="flex flex-col space-y-1">
                   <label className="text-sm text-gray-600">{t('to')}</label>
-                  <Calendar
-                      mode="single"
-                      selected={toDate ?? undefined}
-                      onSelect={(date) => setToDate(date ?? null)}
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                          variant="outline"
+                          className="w-[150px] justify-start text-left font-normal"
+                      >
+                        {toDate ? format(toDate, 'yyyy-MM-dd') : t('pick_date')}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                          mode="single"
+                          selected={toDate ?? undefined}
+                          onSelect={(date) => setToDate(date ?? null)}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
 

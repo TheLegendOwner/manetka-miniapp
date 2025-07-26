@@ -42,7 +42,8 @@ const resources = {
       to: "To",
       token: "Token",
       reward_ton: "Reward (TON)",
-      total: "Summary"
+      total: "Summary",
+      pick_date: "Pick date"
       // …add any other keys you use…
     },
   },
@@ -84,7 +85,8 @@ const resources = {
       to: "До",
       token: "Токен",
       reward_ton: "Доход (TON)",
-      total: "Итого"
+      total: "Итого",
+      pick_date: "Выбрать дату"
       // …добавьте остальные ключи…
     },
   },
