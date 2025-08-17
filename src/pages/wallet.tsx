@@ -66,9 +66,10 @@ export default function WalletPage() {
   const [selectedWalletId, setSelectedWalletId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('balances');
-  const [fromDate, setFromDate] = useState<Date | null>(null);
-  const [toDate, setToDate] = useState<Date | null>(null);
+  const [fromDate, setFromDate] = useState<Date | null>(new Date(2000, 0, 1));
+  const [toDate, setToDate] = useState<Date | null>(new Date());
   const [rewardsStats, setRewardsStats] = useState<Array<{ token: string; amount: number }>>([]);
+  const [exportedImg, setExportedImg] = useState<string | null>(null);
 
   useEffect(() => {
     if (router.query.verified === '1') {
@@ -193,7 +194,7 @@ export default function WalletPage() {
     if (activeTab === 'stats') {
       fetchRewardsStats();
     }
-  }, [activeTab, fromDate, toDate, fetchRewardsStats]);
+  }, [activeTab, fetchRewardsStats]);
 
   useEffect(() => {
     if (token) {
@@ -378,36 +379,50 @@ export default function WalletPage() {
                     onClick={async () => {
                       const element = document.getElementById("stats-table");
                       if (!element) return;
-                      const canvas = await html2canvas(element);
-                      const link = document.createElement("a");
-                      link.href = canvas.toDataURL("image/png");
-                      link.download = `rewards_${Date.now()}.png`;
-                      link.click();
+
+                      const tableCanvas = await html2canvas(element, { backgroundColor: "#ffffff" });
+
+                      const logo = new Image();
+                      logo.src = "/logo.png"; // 👈 положи логотип в public/logo.png
+                      logo.onload = () => {
+                        const finalCanvas = document.createElement("canvas");
+                        const ctx = finalCanvas.getContext("2d");
+                        if (!ctx) return;
+
+                        const headerHeight = logo.height + 40;
+                        finalCanvas.width = tableCanvas.width;
+                        finalCanvas.height = headerHeight + tableCanvas.height;
+
+                        // фон
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+
+                        // логотип
+                        const logoY = 10;
+                        ctx.drawImage(logo, 20, logoY);
+
+                        // надпись справа от логотипа
+                        ctx.font = "bold 28px Arial";
+                        ctx.fillStyle = "#222222";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText("MANETKA Wallet", logo.width + 40, logoY + logo.height / 2);
+
+                        // таблица ниже
+                        ctx.drawImage(tableCanvas, 0, headerHeight);
+
+                        setExportedImg(finalCanvas.toDataURL("image/png"));
+                      };
                     }}
                     className="bg-blue-500 hover:bg-blue-600 text-white"
                 >
                   📸 {t('export_image')}
                 </Button>
-
-                <Button
-                    onClick={() => {
-                      const wsData = [
-                        [t('from'), fromDate ? format(fromDate, "yyyy-MM-dd") : t("not_selected")],
-                        [t('to'), toDate ? format(toDate, "yyyy-MM-dd") : t("not_selected")],
-                        [],
-                        [t('token'), t('reward_ton')],
-                        ...rewardsStats.map(r => [r.token, r.amount]),
-                        [t('total'), rewardsStats.reduce((acc, r) => acc + r.amount, 0)]
-                      ];
-                      const ws = XLSX.utils.aoa_to_sheet(wsData);
-                      const wb = XLSX.utils.book_new();
-                      XLSX.utils.book_append_sheet(wb, ws, "Rewards");
-                      XLSX.writeFile(wb, `rewards_${Date.now()}.xlsx`);
-                    }}
-                    className="bg-green-500 hover:bg-green-600 text-white"
-                >
-                  📊 {t('export_excel')}
-                </Button>
+                {exportedImg && (
+                    <div className="mt-4">
+                      <p className="text-sm">{t('long_press_save')}</p>
+                      <img src={exportedImg} alt="export" className="w-full rounded-md border" />
+                    </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>
