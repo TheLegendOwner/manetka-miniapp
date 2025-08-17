@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useTelegram } from '../context/TelegramContext';
@@ -30,7 +30,14 @@ import html2canvas from "html2canvas";
 
 interface BalancesResponse {
   code: number;
-  data: { balances: Array<{ token: string; logo: string; url: string; sums: Record<'BALANCE' | 'USD' | 'TON' | 'RUB', number> }> };
+  data: {
+    balances: Array<{
+      token: string;
+      logo: string;
+      url: string;
+      sums: Record<'BALANCE' | 'USD' | 'TON' | 'RUB', number>
+    }>
+  };
 }
 interface RewardsResponse {
   code: number;
@@ -46,6 +53,7 @@ interface Wallet {
 
 export default function WalletPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useTranslation();
   const { token, loading: authLoading } = useAuth();
   const { user } = useTelegram();
@@ -72,16 +80,25 @@ export default function WalletPage() {
   const [rewardsStats, setRewardsStats] = useState<Array<{ token: string; amount: number }>>([]);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  // чтобы не рефетчить при каждом выборе даты — только по кнопке
+  // Показываем тост, если вернулись с verified=1
+  useEffect(() => {
+    if (searchParams?.get('verified') === '1') {
+      toast.success(t('wallet_added'));
+    }
+  }, [searchParams, t]);
+
+  // Фетч статистики ревардов по кнопке и при входе на таб "Статистика"
   const fetchRewardsStats = useCallback(async () => {
     if (!token) return;
     setStatsLoading(true);
     try {
       const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
 
-      const walletsToProcess = selectedWalletId === 'all'
-          ? wallets
-          : wallets.filter((w: Wallet) => w.wallet_id === selectedWalletId);
+      // читаем текущее состояние, но НЕ включаем wallets в deps, чтобы не зациклить
+      const walletsToProcess =
+          selectedWalletId === 'all'
+              ? wallets
+              : wallets.filter((w: Wallet) => w.wallet_id === selectedWalletId);
 
       const totalRewards = new Map<string, number>();
 
@@ -108,31 +125,26 @@ export default function WalletPage() {
     } finally {
       setStatsLoading(false);
     }
-  }, [token, wallets, selectedWalletId, fromDate, toDate]);
+  }, [token, selectedWalletId, fromDate, toDate, wallets]);
 
-  useEffect(() => {
-    if (router.query.verified === '1') {
-      toast.success(t('wallet_added'));
-    }
-  }, [router.query, t]);
-
+  // Основной фетч: кошельки + агрегированные балансы/реварды
   const fetchWalletsAndData = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
+      // 1) фетчим wallets
       const wRes = await fetch('/api/wallets', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const { data: { wallets } } = await wRes.json();
+      const wJson = await wRes.json();
+      const fetchedWallets: Wallet[] = wJson?.data?.wallets ?? [];
 
-      setWallets(wallets.map((w: Wallet & { address?: string }) => ({
-        ...w,
-        address: w.address.slice(0, 6) + '......' + w.address.slice(w.address.length - 7, w.address.length - 1)
-      })));
-
-      const walletsToProcess = selectedWalletId === 'all'
-          ? wallets
-          : wallets.filter((w: Wallet) => w.wallet_id === selectedWalletId);
+      // 2) сразу считаем данные по только что полученным fetchedWallets,
+      //    НЕ используя state wallets (чтобы не создавать цикл)
+      const walletsToProcess =
+          selectedWalletId === 'all'
+              ? fetchedWallets
+              : fetchedWallets.filter((w: Wallet) => w.wallet_id === selectedWalletId);
 
       const balMap = new Map<string, { balance: number; usd: number; rub: number; ton: number }>();
       const rewMap = new Map<string, number>();
@@ -180,26 +192,39 @@ export default function WalletPage() {
             rewards: rewMap.get(token) ?? 0
           }))
       );
+
+      // 3) только теперь кладём wallets в состояние (для UI)
+      setWallets(
+          fetchedWallets.map((w: Wallet & { address?: string }) => ({
+            ...w,
+            address:
+                w.address.slice(0, 6) +
+                '......' +
+                w.address.slice(w.address.length - 7, w.address.length - 1),
+          }))
+      );
     } catch (e) {
       console.error('Fetch wallet data failed', e);
     } finally {
       setLoading(false);
     }
-  }, [token, selectedWalletId, wallets]);
+  }, [token, selectedWalletId]);
 
+  // Редирект, если не авторизованы
   useEffect(() => {
     if (!authLoading && !token) {
       router.replace('/');
     }
   }, [authLoading, token, router]);
 
+  // Первичная и последующие загрузки при смене выбранного кошелька
   useEffect(() => {
     if (token) {
       fetchWalletsAndData();
     }
   }, [token, selectedWalletId, fetchWalletsAndData]);
 
-  // при входе на таб "Статистика" один раз загружаем
+  // При входе на таб "Статистика" — один раз загружаем (и при смене выбранного кошелька)
   useEffect(() => {
     if (activeTab === 'stats') {
       fetchRewardsStats();
@@ -265,7 +290,6 @@ export default function WalletPage() {
       const canvas = await html2canvas(temp, { backgroundColor: "#ffffff", scale: 2 });
       const imgData = canvas.toDataURL("image/png");
 
-      // Открываем в новой вкладке/вьювере — в Telegram MiniApp можно сохранить долгим тапом
       const w = window.open("");
       if (w) {
         w.document.write(`<meta name="viewport" content="width=device-width, initial-scale=1" />`);
@@ -305,13 +329,13 @@ export default function WalletPage() {
         {/* Wallet Select + Tokens */}
         <div className="flex flex-col justify-between bg-white border rounded-2xl px-4 py-3 shadow-sm pt-4 pb-24 space-y-4">
           {/* Select wallet */}
-          <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
+          <Select value={selectedWalletId} onValueChange={(v) => setSelectedWalletId(v)}>
             <SelectTrigger className="w-full mb-2">
               <SelectValue placeholder={t('select_wallet')} />
             </SelectTrigger>
             <SelectContent className="z-[9999] bg-white rounded-md shadow-lg">
               <SelectItem value="all">{t('all_wallets')}</SelectItem>
-              {wallets.map(w => (
+              {wallets.map((w) => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
                     {w.address}
                   </SelectItem>
