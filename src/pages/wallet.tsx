@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,8 @@ import {
   Gamepad2,
   Image as ImageIcon,
   Users,
-  Share2
+  Share2,
+  Search, Download
 } from 'lucide-react';
 import {
   Select,
@@ -26,6 +27,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import html2canvas from "html2canvas";
+import * as XLSX from "xlsx";
 
 interface BalancesResponse {
   code: number;
@@ -275,7 +278,7 @@ export default function WalletPage() {
             {/* STATS */}
             <TabsContent value="stats" className="space-y-4">
               {/* Date Filters */}
-              <div className="flex gap-4">
+              <div className="flex gap-4 items-end">
                 {/* FROM DATE */}
                 <div className="flex flex-col space-y-1">
                   <label className="text-sm text-gray-600">{t('from')}</label>
@@ -288,9 +291,10 @@ export default function WalletPage() {
                         {fromDate ? format(fromDate, 'yyyy-MM-dd') : t('pick_date')}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-[9999] bg-white shadow-xl border border-gray-200 rounded-md"
-                                    align="start"
-                                    sideOffset={4}
+                    <PopoverContent
+                        className="w-auto p-0 z-[9999] bg-white shadow-xl border border-gray-200 rounded-md"
+                        align="start"
+                        sideOffset={4}
                     >
                       <Calendar
                           mode="single"
@@ -313,9 +317,10 @@ export default function WalletPage() {
                         {toDate ? format(toDate, 'yyyy-MM-dd') : t('pick_date')}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 z-[9999] bg-white shadow-xl border border-gray-200 rounded-md"
-                                      align="start"
-                                      sideOffset={4}
+                    <PopoverContent
+                        className="w-auto p-0 z-[9999] bg-white shadow-xl border border-gray-200 rounded-md"
+                        align="start"
+                        sideOffset={4}
                     >
                       <Calendar
                           mode="single"
@@ -325,11 +330,25 @@ export default function WalletPage() {
                     </PopoverContent>
                   </Popover>
                 </div>
+
+                {/* APPLY BUTTON */}
+                <Button
+                    onClick={fetchRewardsStats}
+                    className="flex items-center gap-2 bg-[#EBB923] hover:bg-[#e2aa14] text-white"
+                >
+                  🔍 {t('apply')}
+                </Button>
               </div>
 
               {/* Rewards Table */}
-              <div className="overflow-x-auto border rounded-xl">
-                <table className="min-w-full text-sm text-left">
+              <div className="overflow-x-auto border rounded-xl p-4 space-y-4" id="stats-table">
+                {/* Выбранные даты */}
+                <div className="text-sm text-gray-600">
+                  {t('from')}: {fromDate ? format(fromDate, "yyyy-MM-dd") : t("not_selected")} |{" "}
+                  {t('to')}: {toDate ? format(toDate, "yyyy-MM-dd") : t("not_selected")}
+                </div>
+
+                <table className="min-w-full text-sm text-left border">
                   <thead className="bg-gray-100">
                   <tr>
                     <th className="px-4 py-2">{t('token')}</th>
@@ -351,6 +370,44 @@ export default function WalletPage() {
                   </tr>
                   </tbody>
                 </table>
+              </div>
+
+              {/* Export Buttons */}
+              <div className="flex gap-4">
+                <Button
+                    onClick={async () => {
+                      const element = document.getElementById("stats-table");
+                      if (!element) return;
+                      const canvas = await html2canvas(element);
+                      const link = document.createElement("a");
+                      link.href = canvas.toDataURL("image/png");
+                      link.download = `rewards_${Date.now()}.png`;
+                      link.click();
+                    }}
+                    className="bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  📸 {t('export_image')}
+                </Button>
+
+                <Button
+                    onClick={() => {
+                      const wsData = [
+                        [t('from'), fromDate ? format(fromDate, "yyyy-MM-dd") : t("not_selected")],
+                        [t('to'), toDate ? format(toDate, "yyyy-MM-dd") : t("not_selected")],
+                        [],
+                        [t('token'), t('reward_ton')],
+                        ...rewardsStats.map(r => [r.token, r.amount]),
+                        [t('total'), rewardsStats.reduce((acc, r) => acc + r.amount, 0)]
+                      ];
+                      const ws = XLSX.utils.aoa_to_sheet(wsData);
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Rewards");
+                      XLSX.writeFile(wb, `rewards_${Date.now()}.xlsx`);
+                    }}
+                    className="bg-green-500 hover:bg-green-600 text-white"
+                >
+                  📊 {t('export_excel')}
+                </Button>
               </div>
             </TabsContent>
           </Tabs>
