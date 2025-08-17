@@ -382,7 +382,7 @@ export default function WalletPage() {
 
                       const tableCanvas = await html2canvas(element, { backgroundColor: "#ffffff" });
 
-                      const logo = new Image();
+                      const logo = document.createElement("img");
                       logo.src = "/logo.png"; // 👈 положи логотип в public/logo.png
                       logo.onload = () => {
                         const finalCanvas = document.createElement("canvas");
