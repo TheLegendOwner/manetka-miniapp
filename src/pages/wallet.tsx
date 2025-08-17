@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,9 @@ import {
   Gamepad2,
   Image as ImageIcon,
   Users,
-  Share2
+  Share2,
+  X,
+  Download
 } from 'lucide-react';
 import {
   Select,
@@ -80,6 +82,20 @@ export default function WalletPage() {
   const [rewardsStats, setRewardsStats] = useState<Array<{ token: string; amount: number }>>([]);
   const [statsLoading, setStatsLoading] = useState(false);
 
+  // ===== Export preview (универсальные сценарии) =====
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const lastBlobRef = useRef<Blob | null>(null);
+
+  const isIOS = typeof window !== 'undefined'
+      ? (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+      : false;
+
+  const tgWebApp = typeof window !== 'undefined'
+      ? (window as any)?.Telegram?.WebApp
+      : undefined;
+
   // Показываем тост, если вернулись с verified=1
   useEffect(() => {
     if (searchParams?.get('verified') === '1') {
@@ -87,14 +103,13 @@ export default function WalletPage() {
     }
   }, [searchParams, t]);
 
-  // Фетч статистики ревардов по кнопке и при входе на таб "Статистика"
+  // Фетч статистики ревардов
   const fetchRewardsStats = useCallback(async () => {
     if (!token) return;
     setStatsLoading(true);
     try {
       const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
 
-      // читаем текущее состояние, но НЕ включаем wallets в deps, чтобы не зациклить
       const walletsToProcess =
           selectedWalletId === 'all'
               ? wallets
@@ -132,15 +147,14 @@ export default function WalletPage() {
     if (!token) return;
     setLoading(true);
     try {
-      // 1) фетчим wallets
+      // 1) wallets
       const wRes = await fetch('/api/wallets', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const wJson = await wRes.json();
       const fetchedWallets: Wallet[] = wJson?.data?.wallets ?? [];
 
-      // 2) сразу считаем данные по только что полученным fetchedWallets,
-      //    НЕ используя state wallets (чтобы не создавать цикл)
+      // 2) агрегаты
       const walletsToProcess =
           selectedWalletId === 'all'
               ? fetchedWallets
@@ -193,7 +207,7 @@ export default function WalletPage() {
           }))
       );
 
-      // 3) только теперь кладём wallets в состояние (для UI)
+      // 3) в состояние — для UI
       setWallets(
           fetchedWallets.map((w: Wallet & { address?: string }) => ({
             ...w,
@@ -217,29 +231,29 @@ export default function WalletPage() {
     }
   }, [authLoading, token, router]);
 
-  // Первичная и последующие загрузки при смене выбранного кошелька
+  // Первичная и последующие загрузки
   useEffect(() => {
     if (token) {
       fetchWalletsAndData();
     }
   }, [token, selectedWalletId, fetchWalletsAndData]);
 
-  // При входе на таб "Статистика" — один раз загружаем (и при смене выбранного кошелька)
+  // При входе на таб "Статистика"
   useEffect(() => {
     if (activeTab === 'stats') {
       fetchRewardsStats();
     }
   }, [activeTab, selectedWalletId, fetchRewardsStats]);
 
-  // Экспорт в изображение: собираем offscreen DOM и рендерим html2canvas
+  // ====== Экспорт изображения: универсальная реализация ======
   const handleExportImage = async () => {
     const statsContainer = document.getElementById("stats-table");
-    if (!statsContainer) return;
+    if (!statsContainer) {
+      toast.error(t('export_failed') || 'Export failed');
+      return;
+    }
 
-    // Клонируем таблицу, чтобы рендерить offscreen
-    const clonedTable = statsContainer.cloneNode(true) as HTMLElement;
-
-    // Временный контейнер вне экрана
+    // Offscreen контейнер
     const temp = document.createElement("div");
     temp.style.position = "fixed";
     temp.style.left = "-99999px";
@@ -249,15 +263,16 @@ export default function WalletPage() {
     temp.style.padding = "16px";
     temp.style.border = "1px solid #e5e7eb";
     temp.style.borderRadius = "12px";
+    temp.style.boxSizing = "border-box";
 
-    // Заголовок (логотип + текст)
+    // Заголовок
     const header = document.createElement("div");
     header.style.display = "flex";
     header.style.alignItems = "center";
     header.style.marginBottom = "12px";
 
     const logoEl = document.createElement("img");
-    logoEl.src = "/logo.png"; // положите файл в public/logo.png
+    logoEl.src = "/logo.png"; // same-origin файл
     logoEl.style.width = "56px";
     logoEl.style.height = "56px";
     logoEl.style.marginRight = "12px";
@@ -280,26 +295,128 @@ export default function WalletPage() {
     const toStr = toDate ? format(toDate, "yyyy-MM-dd") : t("not_selected");
     dateLine.textContent = `${t('from')}: ${fromStr}  |  ${t('to')}: ${toStr}`;
 
+    // Клонируем таблицу
+    const clonedTable = statsContainer.cloneNode(true) as HTMLElement;
+
     temp.appendChild(header);
     temp.appendChild(dateLine);
     temp.appendChild(clonedTable);
-
     document.body.appendChild(temp);
 
     try {
-      const canvas = await html2canvas(temp, { backgroundColor: "#ffffff", scale: 2 });
-      const imgData = canvas.toDataURL("image/png");
-
-      const w = window.open("");
-      if (w) {
-        w.document.write(`<meta name="viewport" content="width=device-width, initial-scale=1" />`);
-        w.document.write(`<img src="${imgData}" style="display:block;max-width:100%;height:auto;margin:0 auto;" />`);
+      // Ждем подгрузки шрифтов, иначе возможны пустые глифы в Safari
+      // @ts-ignore
+      if (document.fonts?.ready) {
+        // @ts-ignore
+        await document.fonts.ready;
       }
+
+      const scale = Math.max(2, Math.floor(window.devicePixelRatio || 2));
+      const canvas = await html2canvas(temp, {
+        backgroundColor: "#ffffff",
+        scale,
+        useCORS: true,     // на случай внешних картинок (лучше все для экспорта делать same-origin)
+        allowTaint: false,
+        logging: false
+      });
+
+      // toBlob предпочтительнее (меньше память, быстрее чем dataURL)
+      const blob: Blob | null = await new Promise((resolve) =>
+          canvas.toBlob((b) => resolve(b), 'image/png')
+      );
+
+      let url: string;
+      if (blob) {
+        lastBlobRef.current = blob;
+        url = URL.createObjectURL(blob);
+      } else {
+        // Фолбек
+        url = canvas.toDataURL('image/png');
+      }
+
+      const fileName = `manetka-stats_${fromStr}_${toStr}.png`.replace(/\s+/g, '_');
+
+      // 1) Пытаемся автоскачать (ПК/Android)
+      // На iOS/в WebView download может не сработать — тогда оставим превью для долгого тапа
+      const tryAutoDownload = () => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.rel = 'noopener';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+        }, 0);
+      };
+
+      if (!isIOS) {
+        // Android/desktop: пробуем автоскачивание
+        tryAutoDownload();
+      }
+
+      // 2) Показываем превью всегда — чтобы на iOS/в webview можно было сохранить долгим тапом
+      setPreviewUrl(url);
+      setPreviewOpen(true);
     } catch (e) {
       console.error("Export image failed", e);
       toast.error(t('export_failed') || 'Export failed');
     } finally {
+      // Чистим offscreen
       document.body.removeChild(temp);
+    }
+  };
+
+  const handleClosePreview = () => {
+    if (previewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    setPreviewOpen(false);
+    lastBlobRef.current = null;
+  };
+
+  const handleShare = async () => {
+    try {
+      const blob = lastBlobRef.current;
+      if (!blob) {
+        // на всякий случай
+        if (previewUrl) {
+          if (tgWebApp?.openLink) {
+            tgWebApp.openLink(previewUrl);
+          } else {
+            window.open(previewUrl, '_blank');
+          }
+        }
+        return;
+      }
+
+      const file = new File([blob], 'manetka-stats.png', { type: 'image/png' });
+
+      // Web Share API Level 2 (файлы)
+      if ((navigator as any).canShare?.({ files: [file] })) {
+        await (navigator as any).share({
+          files: [file],
+          title: 'MANETKA Wallet',
+          text: 'Rewards stats'
+        });
+        return;
+      }
+
+      // Telegram WebApp — просто открываем ссылку (позволит сохранить/шерить)
+      if (tgWebApp?.openLink && previewUrl) {
+        tgWebApp.openLink(previewUrl);
+        return;
+      }
+
+      // Фолбек — открыть в новой вкладке/окне
+      if (previewUrl) {
+        window.open(previewUrl, '_blank');
+      }
+    } catch (err) {
+      console.error('Share failed', err);
+      toast.error(t('export_failed') || 'Export failed');
     }
   };
 
@@ -476,7 +593,9 @@ export default function WalletPage() {
                 <Button onClick={handleExportImage} className="bg-blue-500 hover:bg-blue-600 text-white w-full">
                   📸 {t('export_image')}
                 </Button>
-                <p className="text-xs text-gray-500">{t('long_press_save') || 'Откроется картинка — сохраните долгим нажатием.'}</p>
+                <p className="text-xs text-gray-500">
+                  {t('long_press_save') || 'Если автоскачивание не началось — выше появится превью: сохраните долгим нажатием или через «Поделиться».'}
+                </p>
               </div>
             </TabsContent>
           </Tabs>
@@ -505,6 +624,54 @@ export default function WalletPage() {
             <span className="text-xs">{t('refs')}</span>
           </button>
         </div>
+
+        {/* ===== Overlay превью для iOS/WebView и универсального сценария ===== */}
+        {previewOpen && previewUrl && (
+            <div className="fixed inset-0 z-[10000] bg-black/70 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-[720px] max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b">
+                  <h3 className="font-semibold text-base">Preview</h3>
+                  <button onClick={handleClosePreview} className="p-2 rounded hover:bg-gray-100">
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="p-4 overflow-auto">
+                  <img
+                      src={previewUrl}
+                      alt="Export preview"
+                      className="max-w-full h-auto mx-auto rounded-lg border"
+                  />
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    {isIOS
+                        ? 'Долгий тап по изображению, чтобы сохранить.'
+                        : 'Если файл не скачался автоматически, сохраните изображение вручную.'}
+                  </p>
+                </div>
+                <div className="flex gap-2 px-4 py-3 border-t">
+                  <Button
+                      onClick={() => {
+                        // ручное скачивание (на ПК/Android)
+                        const a = document.createElement('a');
+                        a.href = previewUrl;
+                        a.download = 'manetka-stats.png';
+                        a.rel = 'noopener';
+                        a.style.display = 'none';
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => document.body.removeChild(a), 0);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2"
+                  >
+                    <Download size={16} />
+                    {t('download') || 'Скачать'}
+                  </Button>
+                  <Button onClick={handleShare} variant="outline" className="flex-1">
+                    {t('share') || 'Поделиться'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+        )}
       </div>
   );
 }
