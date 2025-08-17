@@ -113,7 +113,6 @@ export default function WalletPage() {
     }
   }, [searchParams, t]);
 
-  // ===== Загрузка кошельков и агрегатов =====
   const fetchWalletsAndData = async () => {
     if (!token) return;
     setLoading(true);
