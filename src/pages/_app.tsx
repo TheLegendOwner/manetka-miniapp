@@ -38,7 +38,8 @@ export default function App({ Component, pageProps }: AppProps) {
       <TelegramProvider>
         <AuthProvider>
           <Component {...pageProps} />
-          <ToastContainer position="top-right" autoClose={4000} />
+          <ToastContainer position="top-right" autoClose={4000}
+                          style={{ zIndex: 2147483647 }}/>
         </AuthProvider>
       </TelegramProvider>
     </TonConnectUIProvider>

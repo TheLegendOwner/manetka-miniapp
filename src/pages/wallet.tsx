@@ -590,7 +590,7 @@ export default function WalletPage() {
             <ModalPortal>
               <div
                   className="fixed inset-0 flex items-center justify-center p-4"
-                  style={{ zIndex: 2147483647, background: 'rgba(0,0,0,0.7)' }}
+                  style={{ zIndex: 2147483000, background: 'rgba(0,0,0,0.7)' }}
               >
                 <div
                     className="bg-white rounded-2xl shadow-xl w-full max-w-[720px] max-h-[90vh] flex flex-col relative"
