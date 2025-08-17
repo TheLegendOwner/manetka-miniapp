@@ -192,7 +192,7 @@ export default function WalletPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, selectedWalletId]);
 
-  // ===== Статистика: только по кнопке + один раз при первом заходе =====
+
   const hasLoadedStatsRef = useRef(false);
 
   const fetchRewardsStats = async () => {
