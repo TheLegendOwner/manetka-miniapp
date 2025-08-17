@@ -506,13 +506,13 @@ export default function WalletPage() {
                     </PopoverContent>
                   </Popover>
                 </div>
-
+                <br/>
                 {/* APPLY — единственный триггер загрузки */}
                 <Button
                     onClick={fetchRewardsStats}
                     className="flex items-center gap-2 bg-[#EBB923] hover:bg-[#e2aa14] text-white"
                 >
-                  🔍 {t('apply')}
+                  🔍 {t('filter')}
                 </Button>
               </div>
 
@@ -556,9 +556,6 @@ export default function WalletPage() {
                 <Button onClick={handleExportImage} className="bg-blue-500 hover:bg-blue-600 text-white w-full">
                   📸 {t('export_image')}
                 </Button>
-                <p className="text-xs text-gray-500">
-                  {t('long_press_save') || 'Если автоскачивание не началось — появится превью: сохраните, поделитесь или откройте в этом окне.'}
-                </p>
               </div>
             </TabsContent>
           </Tabs>
@@ -628,44 +625,10 @@ export default function WalletPage() {
                   </div>
 
                   <div className="flex flex-col gap-2 px-4 py-3 border-t sm:flex-row">
-                    {/* DOWNLOAD — <a href target="_self"> + дубль через location.href */}
-                    <a
-                        href={downloadUrl || '#'}
-                        target="_self"
-                        className={`flex-1 inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition ${
-                            downloadUrl ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-200 text-gray-400 pointer-events-none'
-                        }`}
-                        onClick={(e) => {
-                          if (!downloadUrl) { e.preventDefault(); return; }
-                          // дубль для среды, где <a> может игнорироваться
-                          setTimeout(() => { try { window.location.href = downloadUrl; } catch {} }, 0);
-                        }}
-                    >
-                      <Download size={16} />
-                      {t('download') || 'Скачать'}
-                    </a>
-
                     {/* SHARE */}
                     <Button onClick={handleShare} variant="outline" className="flex-1">
                       {t('share') || 'Поделиться'}
                     </Button>
-
-                    {/* OPEN IN THIS WINDOW — надёжно для Android/TG WV */}
-                    <a
-                        href={downloadUrl || '#'}
-                        target="_self"
-                        className={`flex-1 inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50 transition ${
-                            downloadUrl ? '' : 'pointer-events-none opacity-50'
-                        }`}
-                        onClick={(e) => {
-                          if (!downloadUrl) { e.preventDefault(); return; }
-                          // дубль
-                          setTimeout(() => { try { window.location.href = downloadUrl; } catch {} }, 0);
-                        }}
-                    >
-                      <LinkIcon size={16} />
-                      {t('open_external') || 'Открыть ссылку здесь'}
-                    </a>
                   </div>
                 </div>
               </div>
