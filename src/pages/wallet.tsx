@@ -324,7 +324,7 @@ export default function WalletPage() {
         const fd = new FormData();
         fd.append('file', blob, fileName);
         fd.append('filename', fileName);
-        const resp = await fetch('/api/export-image', { method: 'POST', body: fd });
+        const resp = await fetch('/api/export-image', { method: 'POST', body: fd, headers: { Authorization: `Bearer ${token}` } });
         if (resp.ok) {
           const json = await resp.json();
           serverUrl = json?.url || null;
