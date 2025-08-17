@@ -1,19 +1,18 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useTelegram } from '../context/TelegramContext';
 import { toast } from 'react-toastify';
-import Image from 'next/image';
+import NextImage from 'next/image';
 import {
   Wallet as WalletIcon,
   Gamepad2,
   Image as ImageIcon,
   Users,
-  Share2,
-  Search, Download
+  Share2
 } from 'lucide-react';
 import {
   Select,
@@ -28,7 +27,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import html2canvas from "html2canvas";
-import * as XLSX from "xlsx";
 
 interface BalancesResponse {
   code: number;
@@ -65,17 +63,58 @@ export default function WalletPage() {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [selectedWalletId, setSelectedWalletId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('balances');
+  const [activeTab, setActiveTab] = useState<'balances' | 'stats'>('balances');
+
+  // Даты по умолчанию
   const [fromDate, setFromDate] = useState<Date | null>(new Date(2000, 0, 1));
   const [toDate, setToDate] = useState<Date | null>(new Date());
+
   const [rewardsStats, setRewardsStats] = useState<Array<{ token: string; amount: number }>>([]);
-  const [exportedImg, setExportedImg] = useState<string | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  // чтобы не рефетчить при каждом выборе даты — только по кнопке
+  const fetchRewardsStats = useCallback(async () => {
+    if (!token) return;
+    setStatsLoading(true);
+    try {
+      const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+
+      const walletsToProcess = selectedWalletId === 'all'
+          ? wallets
+          : wallets.filter((w: Wallet) => w.wallet_id === selectedWalletId);
+
+      const totalRewards = new Map<string, number>();
+
+      for (const w of walletsToProcess) {
+        let endpoint = `/api/rewards/${w.wallet_id}`;
+        if (fromDate && toDate) {
+          endpoint = `/api/rewards/${w.wallet_id}/between/${fmt(fromDate)}/${fmt(toDate)}`;
+        }
+
+        const res = await fetch(endpoint, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const { data: { rewards } }: RewardsResponse = await res.json();
+
+        rewards.forEach(r => {
+          totalRewards.set(r.token, (totalRewards.get(r.token) ?? 0) + r.amount);
+        });
+      }
+
+      const result = Array.from(totalRewards.entries()).map(([token, amount]) => ({ token, amount }));
+      setRewardsStats(result);
+    } catch (e) {
+      console.error('Failed to fetch reward stats', e);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [token, wallets, selectedWalletId, fromDate, toDate]);
 
   useEffect(() => {
     if (router.query.verified === '1') {
       toast.success(t('wallet_added'));
     }
-  }, [router.query]);
+  }, [router.query, t]);
 
   const fetchWalletsAndData = useCallback(async () => {
     if (!token) return;
@@ -88,7 +127,7 @@ export default function WalletPage() {
 
       setWallets(wallets.map((w: Wallet & { address?: string }) => ({
         ...w,
-        address: w.address.slice(0, 6) + '......' + w.address.slice(w.address.length-7, w.address.length-1)
+        address: w.address.slice(0, 6) + '......' + w.address.slice(w.address.length - 7, w.address.length - 1)
       })));
 
       const walletsToProcess = selectedWalletId === 'all'
@@ -146,43 +185,7 @@ export default function WalletPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, selectedWalletId]);
-
-  const fetchRewardsStats = useCallback(async () => {
-    if (!token) return;
-    try {
-      const formatDate = (date: Date) => format(date, 'yyyy-MM-dd');
-      const from = fromDate ? formatDate(fromDate) : null;
-      const to = toDate ? formatDate(toDate) : null;
-
-      const walletsToProcess = selectedWalletId === 'all'
-          ? wallets
-          : wallets.filter((w: Wallet) => w.wallet_id === selectedWalletId);
-
-      const totalRewards = new Map<string, number>();
-
-      for (const w of walletsToProcess) {
-        let endpoint = `/api/rewards/${w.wallet_id}`;
-        if (from && to) {
-          endpoint = `/api/rewards/${w.wallet_id}/between/${from}/${to}`;
-        }
-
-        const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const { data: { rewards } }: RewardsResponse = await res.json();
-
-        rewards.forEach(r => {
-          totalRewards.set(r.token, (totalRewards.get(r.token) ?? 0) + r.amount);
-        });
-      }
-
-      const result = Array.from(totalRewards.entries()).map(([token, amount]) => ({ token, amount }));
-      setRewardsStats(result);
-    } catch (e) {
-      console.error('Failed to fetch reward stats', e);
-    }
-  }, [token, wallets, selectedWalletId, fromDate, toDate]);
+  }, [token, selectedWalletId, wallets]);
 
   useEffect(() => {
     if (!authLoading && !token) {
@@ -191,16 +194,90 @@ export default function WalletPage() {
   }, [authLoading, token, router]);
 
   useEffect(() => {
-    if (activeTab === 'stats') {
-      fetchRewardsStats();
-    }
-  }, [activeTab, fetchRewardsStats]);
-
-  useEffect(() => {
     if (token) {
       fetchWalletsAndData();
     }
   }, [token, selectedWalletId, fetchWalletsAndData]);
+
+  // при входе на таб "Статистика" один раз загружаем
+  useEffect(() => {
+    if (activeTab === 'stats') {
+      fetchRewardsStats();
+    }
+  }, [activeTab, selectedWalletId, fetchRewardsStats]);
+
+  // Экспорт в изображение: собираем offscreen DOM и рендерим html2canvas
+  const handleExportImage = async () => {
+    const statsContainer = document.getElementById("stats-table");
+    if (!statsContainer) return;
+
+    // Клонируем таблицу, чтобы рендерить offscreen
+    const clonedTable = statsContainer.cloneNode(true) as HTMLElement;
+
+    // Временный контейнер вне экрана
+    const temp = document.createElement("div");
+    temp.style.position = "fixed";
+    temp.style.left = "-99999px";
+    temp.style.top = "-99999px";
+    temp.style.width = `${statsContainer.clientWidth}px`;
+    temp.style.background = "#ffffff";
+    temp.style.padding = "16px";
+    temp.style.border = "1px solid #e5e7eb";
+    temp.style.borderRadius = "12px";
+
+    // Заголовок (логотип + текст)
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.alignItems = "center";
+    header.style.marginBottom = "12px";
+
+    const logoEl = document.createElement("img");
+    logoEl.src = "/logo.png"; // положите файл в public/logo.png
+    logoEl.style.width = "56px";
+    logoEl.style.height = "56px";
+    logoEl.style.marginRight = "12px";
+
+    const titleEl = document.createElement("span");
+    titleEl.textContent = "MANETKA Wallet";
+    titleEl.style.fontSize = "22px";
+    titleEl.style.fontWeight = "700";
+    titleEl.style.color = "#222";
+
+    header.appendChild(logoEl);
+    header.appendChild(titleEl);
+
+    // Даты
+    const dateLine = document.createElement("div");
+    dateLine.style.fontSize = "14px";
+    dateLine.style.color = "#4b5563";
+    dateLine.style.margin = "8px 0 12px 0";
+    const fromStr = fromDate ? format(fromDate, "yyyy-MM-dd") : t("not_selected");
+    const toStr = toDate ? format(toDate, "yyyy-MM-dd") : t("not_selected");
+    dateLine.textContent = `${t('from')}: ${fromStr}  |  ${t('to')}: ${toStr}`;
+
+    temp.appendChild(header);
+    temp.appendChild(dateLine);
+    temp.appendChild(clonedTable);
+
+    document.body.appendChild(temp);
+
+    try {
+      const canvas = await html2canvas(temp, { backgroundColor: "#ffffff", scale: 2 });
+      const imgData = canvas.toDataURL("image/png");
+
+      // Открываем в новой вкладке/вьювере — в Telegram MiniApp можно сохранить долгим тапом
+      const w = window.open("");
+      if (w) {
+        w.document.write(`<meta name="viewport" content="width=device-width, initial-scale=1" />`);
+        w.document.write(`<img src="${imgData}" style="display:block;max-width:100%;height:auto;margin:0 auto;" />`);
+      }
+    } catch (e) {
+      console.error("Export image failed", e);
+      toast.error(t('export_failed') || 'Export failed');
+    } finally {
+      document.body.removeChild(temp);
+    }
+  };
 
   if (authLoading || loading) {
     return <p className="p-4 text-center">Loading…</p>;
@@ -215,7 +292,7 @@ export default function WalletPage() {
               className="w-9 h-9 rounded-full overflow-hidden cursor-pointer"
               onClick={() => router.push('/account')}
           >
-            <Image
+            <NextImage
                 src={user?.photo_url || '/icons/avatar-default.svg'}
                 alt="avatar"
                 width={36}
@@ -232,7 +309,7 @@ export default function WalletPage() {
             <SelectTrigger className="w-full mb-2">
               <SelectValue placeholder={t('select_wallet')} />
             </SelectTrigger>
-            <SelectContent className="z-50 bg-white rounded-md shadow-lg">
+            <SelectContent className="z-[9999] bg-white rounded-md shadow-lg">
               <SelectItem value="all">{t('all_wallets')}</SelectItem>
               {wallets.map(w => (
                   <SelectItem key={w.wallet_id} value={w.wallet_id}>
@@ -242,8 +319,8 @@ export default function WalletPage() {
             </SelectContent>
           </Select>
 
-          {/* Token cards */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'balances' | 'stats')} className="w-full">
             <TabsList className="w-full grid grid-cols-2 mb-4">
               <TabsTrigger value="balances">{t('balances')}</TabsTrigger>
               <TabsTrigger value="stats">{t('statistics')}</TabsTrigger>
@@ -264,7 +341,7 @@ export default function WalletPage() {
                         <p className="text-sm text-gray-500">{t('balance_ton')}: {tok.ton.toFixed(4)} TON</p>
                         <p className="text-sm text-green-600 font-semibold">{t('rewards')}: {tok.rewards.toFixed(4)} TON</p>
                       </div>
-                      <Image src={tok.logo} alt={tok.token} width={64} height={64} />
+                      <NextImage src={tok.logo} alt={tok.token} width={64} height={64} />
                     </div>
                     <button
                         onClick={() => window.open(tok.url, '_blank')}
@@ -279,16 +356,13 @@ export default function WalletPage() {
             {/* STATS */}
             <TabsContent value="stats" className="space-y-4">
               {/* Date Filters */}
-              <div className="flex gap-4 items-end">
-                {/* FROM DATE */}
+              <div className="flex gap-3 items-end">
+                {/* FROM */}
                 <div className="flex flex-col space-y-1">
                   <label className="text-sm text-gray-600">{t('from')}</label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                          variant="outline"
-                          className="w-[150px] justify-start text-left font-normal"
-                      >
+                      <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
                         {fromDate ? format(fromDate, 'yyyy-MM-dd') : t('pick_date')}
                       </Button>
                     </PopoverTrigger>
@@ -306,15 +380,12 @@ export default function WalletPage() {
                   </Popover>
                 </div>
 
-                {/* TO DATE */}
+                {/* TO */}
                 <div className="flex flex-col space-y-1">
                   <label className="text-sm text-gray-600">{t('to')}</label>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                          variant="outline"
-                          className="w-[150px] justify-start text-left font-normal"
-                      >
+                      <Button variant="outline" className="w-[160px] justify-start text-left font-normal">
                         {toDate ? format(toDate, 'yyyy-MM-dd') : t('pick_date')}
                       </Button>
                     </PopoverTrigger>
@@ -332,7 +403,7 @@ export default function WalletPage() {
                   </Popover>
                 </div>
 
-                {/* APPLY BUTTON */}
+                {/* APPLY */}
                 <Button
                     onClick={fetchRewardsStats}
                     className="flex items-center gap-2 bg-[#EBB923] hover:bg-[#e2aa14] text-white"
@@ -342,87 +413,46 @@ export default function WalletPage() {
               </div>
 
               {/* Rewards Table */}
-              <div className="overflow-x-auto border rounded-xl p-4 space-y-4" id="stats-table">
-                {/* Выбранные даты */}
+              <div className="space-y-2">
                 <div className="text-sm text-gray-600">
-                  {t('from')}: {fromDate ? format(fromDate, "yyyy-MM-dd") : t("not_selected")} |{" "}
-                  {t('to')}: {toDate ? format(toDate, "yyyy-MM-dd") : t("not_selected")}
+                  {t('from')}: {fromDate ? format(fromDate, 'yyyy-MM-dd') : t('not_selected')} |{' '}
+                  {t('to')}: {toDate ? format(toDate, 'yyyy-MM-dd') : t('not_selected')}
                 </div>
 
-                <table className="min-w-full text-sm text-left border">
-                  <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-4 py-2">{t('token')}</th>
-                    <th className="px-4 py-2">{t('reward_ton')}</th>
-                  </tr>
-                  </thead>
-                  <tbody>
-                  {rewardsStats.map(r => (
-                      <tr key={r.token}>
-                        <td className="px-4 py-2 font-medium">{r.token}</td>
-                        <td className="px-4 py-2">{r.amount.toFixed(4)} TON</td>
-                      </tr>
-                  ))}
-                  <tr className="font-bold bg-gray-50">
-                    <td className="px-4 py-2">{t('total')}</td>
-                    <td className="px-4 py-2">
-                      {rewardsStats.reduce((acc, r) => acc + r.amount, 0).toFixed(4)} TON
-                    </td>
-                  </tr>
-                  </tbody>
-                </table>
-              </div>
+                <div className="overflow-x-auto border rounded-xl p-4" id="stats-table">
+                  {statsLoading ? (
+                      <p className="text-center">Loading…</p>
+                  ) : (
+                      <table className="min-w-full text-sm text-left">
+                        <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-4 py-2">{t('token')}</th>
+                          <th className="px-4 py-2">{t('reward_ton')}</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {rewardsStats.map(r => (
+                            <tr key={r.token} className="border-t">
+                              <td className="px-4 py-2 font-medium">{r.token}</td>
+                              <td className="px-4 py-2">{r.amount.toFixed(4)} TON</td>
+                            </tr>
+                        ))}
+                        <tr className="font-bold bg-gray-50 border-t">
+                          <td className="px-4 py-2">{t('total')}</td>
+                          <td className="px-4 py-2">
+                            {rewardsStats.reduce((acc, r) => acc + r.amount, 0).toFixed(4)} TON
+                          </td>
+                        </tr>
+                        </tbody>
+                      </table>
+                  )}
+                </div>
 
-              {/* Export Buttons */}
-              <div className="flex gap-4">
-                <Button
-                    onClick={async () => {
-                      const element = document.getElementById("stats-table");
-                      if (!element) return;
-
-                      const tableCanvas = await html2canvas(element, { backgroundColor: "#ffffff" });
-
-                      const logo = document.createElement("img");
-                      logo.src = "/logo.png"; // 👈 положи логотип в public/logo.png
-                      logo.onload = () => {
-                        const finalCanvas = document.createElement("canvas");
-                        const ctx = finalCanvas.getContext("2d");
-                        if (!ctx) return;
-
-                        const headerHeight = logo.height + 40;
-                        finalCanvas.width = tableCanvas.width;
-                        finalCanvas.height = headerHeight + tableCanvas.height;
-
-                        // фон
-                        ctx.fillStyle = "#ffffff";
-                        ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
-
-                        // логотип
-                        const logoY = 10;
-                        ctx.drawImage(logo, 20, logoY);
-
-                        // надпись справа от логотипа
-                        ctx.font = "bold 28px Arial";
-                        ctx.fillStyle = "#222222";
-                        ctx.textBaseline = "middle";
-                        ctx.fillText("MANETKA Wallet", logo.width + 40, logoY + logo.height / 2);
-
-                        // таблица ниже
-                        ctx.drawImage(tableCanvas, 0, headerHeight);
-
-                        setExportedImg(finalCanvas.toDataURL("image/png"));
-                      };
-                    }}
-                    className="bg-blue-500 hover:bg-blue-600 text-white"
-                >
+                {/* Export Image */}
+                <Button onClick={handleExportImage} className="bg-blue-500 hover:bg-blue-600 text-white w-full">
                   📸 {t('export_image')}
                 </Button>
-                {exportedImg && (
-                    <div className="mt-4">
-                      <p className="text-sm">{t('long_press_save')}</p>
-                      <img src={exportedImg} alt="export" className="w-full rounded-md border" />
-                    </div>
-                )}
+                <p className="text-xs text-gray-500">{t('long_press_save') || 'Откроется картинка — сохраните долгим нажатием.'}</p>
               </div>
             </TabsContent>
           </Tabs>
