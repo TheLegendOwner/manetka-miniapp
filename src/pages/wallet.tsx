@@ -82,9 +82,11 @@ export default function WalletPage() {
   const [rewardsStats, setRewardsStats] = useState<Array<{ token: string; amount: number }>>([]);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  // ===== Export preview (универсальные сценарии) =====
+  // ===== Экспорт / превью =====
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);           // универсальный для <img>
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);   // blob:
+  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);   // data:
   const lastBlobRef = useRef<Blob | null>(null);
 
   const isIOS = typeof window !== 'undefined'
@@ -96,14 +98,14 @@ export default function WalletPage() {
   const tgWebApp = typeof window !== 'undefined' ? (window as any)?.Telegram?.WebApp : undefined;
   const isTelegramWV = !!tgWebApp;
 
-  // Показываем тост, если вернулись с verified=1
+  // Показать тост, если вернулись с verified=1
   useEffect(() => {
     if (searchParams?.get('verified') === '1') {
       toast.success(t('wallet_added'));
     }
   }, [searchParams, t]);
 
-  // Фетч статистики ревардов
+  // ===== Фетч статистики (только по кнопке + первый вход на вкладку) =====
   const fetchRewardsStats = useCallback(async () => {
     if (!token) return;
     setStatsLoading(true);
@@ -140,9 +142,9 @@ export default function WalletPage() {
     } finally {
       setStatsLoading(false);
     }
-  }, [token, selectedWalletId, fromDate, toDate, wallets]);
+  }, [token]); // важно: не зависим от дат/кошелька, вызывается вручную
 
-  // Основной фетч: кошельки + агрегированные балансы/реварды
+  // Основной фетч кошельков и агрегатов
   const fetchWalletsAndData = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -231,21 +233,23 @@ export default function WalletPage() {
     }
   }, [authLoading, token, router]);
 
-  // Первичная и последующие загрузки
+  // Первичная и последующие загрузки при смене выбранного кошелька
   useEffect(() => {
     if (token) {
       fetchWalletsAndData();
     }
   }, [token, selectedWalletId, fetchWalletsAndData]);
 
-  // При входе на таб "Статистика"
+  // Первый вход на таб "Статистика" — один раз
+  const hasLoadedStatsRef = useRef(false);
   useEffect(() => {
-    if (activeTab === 'stats') {
-      fetchRewardsStats();
+    if (activeTab === 'stats' && !hasLoadedStatsRef.current) {
+      hasLoadedStatsRef.current = true;
+      fetchRewardsStats(); // начальная загрузка один раз
     }
-  }, [activeTab, selectedWalletId, fetchRewardsStats]);
+  }, [activeTab, fetchRewardsStats]);
 
-  // ====== Экспорт изображения: универсальная реализация ======
+  // ====== Экспорт изображения ======
   const handleExportImage = async () => {
     const statsContainer = document.getElementById("stats-table");
     if (!statsContainer) {
@@ -272,7 +276,7 @@ export default function WalletPage() {
     header.style.marginBottom = "12px";
 
     const logoEl = document.createElement("img");
-    logoEl.src = "/logo.png"; // same-origin файл
+    logoEl.src = "/logo.png";
     logoEl.style.width = "56px";
     logoEl.style.height = "56px";
     logoEl.style.marginRight = "12px";
@@ -304,7 +308,7 @@ export default function WalletPage() {
     document.body.appendChild(temp);
 
     try {
-      // Ждем подгрузки шрифтов
+      // Ждем шрифты
       // @ts-ignore
       if (document.fonts?.ready) {
         // @ts-ignore
@@ -320,43 +324,39 @@ export default function WalletPage() {
         logging: false
       });
 
-      // toBlob предпочтительнее
+      // blob + dataURL (для Android/TG WV)
       const blob: Blob | null = await new Promise((resolve) =>
           canvas.toBlob((b) => resolve(b), 'image/png')
       );
 
-      let url: string;
+      let blobUrl: string | null = null;
+      let dataUrl: string | null = null;
+
       if (blob) {
         lastBlobRef.current = blob;
-        url = URL.createObjectURL(blob);
-      } else {
-        url = canvas.toDataURL('image/png');
+        blobUrl = URL.createObjectURL(blob);
       }
+      dataUrl = canvas.toDataURL('image/png');
 
-      const fileName = `manetka-stats_${fromStr}_${toStr}.png`.replace(/\s+/g, '_');
+      // Выбор универсальной ссылки для <img>
+      const universalUrl = blobUrl || dataUrl;
 
-      // 1) Попытка автоскачивания (ПК/Android вне WebView)
-      const tryAutoDownload = () => {
+      setPreviewBlobUrl(blobUrl);
+      setPreviewDataUrl(dataUrl);
+      setPreviewUrl(universalUrl);
+      setPreviewOpen(true);
+
+      // На десктопе вне WebView — автоскачивание
+      if (!isIOS && !isTelegramWV && universalUrl) {
         const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
+        a.href = universalUrl;
+        a.download = `manetka-stats_${fromStr}_${toStr}.png`.replace(/\s+/g, '_');
         a.rel = 'noopener';
         a.target = '_blank';
-        a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
-        setTimeout(() => {
-          document.body.removeChild(a);
-        }, 0);
-      };
-
-      if (!isIOS && !isTelegramWV) {
-        tryAutoDownload();
+        setTimeout(() => document.body.removeChild(a), 0);
       }
-
-      // 2) Показываем превью — для iOS/WebView и как универсальный UX
-      setPreviewUrl(url);
-      setPreviewOpen(true);
     } catch (e) {
       console.error("Export image failed", e);
       toast.error(t('export_failed') || 'Export failed');
@@ -366,63 +366,53 @@ export default function WalletPage() {
   };
 
   const handleClosePreview = () => {
-    if (previewUrl?.startsWith('blob:')) {
-      URL.revokeObjectURL(previewUrl);
-    }
+    if (previewBlobUrl?.startsWith('blob:')) URL.revokeObjectURL(previewBlobUrl);
+    setPreviewBlobUrl(null);
+    setPreviewDataUrl(null);
     setPreviewUrl(null);
     setPreviewOpen(false);
     lastBlobRef.current = null;
   };
 
-  // Обновлённый share с надёжными фолбеками
+  // Надёжный share
   const handleShare = async () => {
     try {
       const blob = lastBlobRef.current;
 
-      if (!blob) {
-        if (tgWebApp?.openLink && previewUrl) {
-          tgWebApp.openLink(previewUrl);
-        } else if (previewUrl) {
-          window.open(previewUrl, '_blank', 'noopener,noreferrer');
+      if (blob) {
+        const file = new File([blob], 'manetka-stats.png', { type: 'image/png' });
+
+        // 1) Web Share API с файлами
+        if ((navigator as any).canShare?.({ files: [file] })) {
+          await (navigator as any).share({
+            files: [file],
+            title: 'MANETKA Wallet',
+            text: 'Rewards stats'
+          });
+          return;
         }
-        return;
       }
 
-      const file = new File([blob], 'manetka-stats.png', { type: 'image/png' });
-
-      // 1) Web Share API с файлами
-      if ((navigator as any).canShare?.({ files: [file] })) {
-        await (navigator as any).share({
-          files: [file],
-          title: 'MANETKA Wallet',
-          text: 'Rewards stats'
-        });
-        return;
-      }
-
-      // 2) Web Share API без файлов (хотя пользы мало) + открыть превью во внешнем браузере
+      // 2) Web Share API без файлов
       if ((navigator as any).share) {
         await (navigator as any).share({
           title: 'MANETKA Wallet',
           text: 'Rewards stats'
         }).catch(() => {});
-        if (tgWebApp?.openLink && previewUrl) {
-          tgWebApp.openLink(previewUrl);
-        } else if (previewUrl) {
-          window.open(previewUrl, '_blank', 'noopener,noreferrer');
+        // Откроем картинку во внешнем браузере
+        const openUrl = (isAndroid && isTelegramWV) ? (previewDataUrl || previewUrl) : (previewBlobUrl || previewDataUrl || previewUrl);
+        if (openUrl) {
+          if (tgWebApp?.openLink) tgWebApp.openLink(openUrl);
+          else window.open(openUrl, '_blank', 'noopener,noreferrer');
         }
         return;
       }
 
-      // 3) Telegram WebView или отсутствует share: открываем внешним браузером
-      if (tgWebApp?.openLink && previewUrl) {
-        tgWebApp.openLink(previewUrl);
-        return;
-      }
-
-      // 4) Фолбек: новая вкладка
-      if (previewUrl) {
-        window.open(previewUrl, '_blank', 'noopener,noreferrer');
+      // 3) Telegram WebView / нет share: открываем во внешнем браузере
+      const openUrl = (isAndroid && isTelegramWV) ? (previewDataUrl || previewUrl) : (previewBlobUrl || previewDataUrl || previewUrl);
+      if (openUrl) {
+        if (tgWebApp?.openLink) tgWebApp.openLink(openUrl);
+        else window.open(openUrl, '_blank', 'noopener,noreferrer');
       }
     } catch (err) {
       console.error('Share failed', err);
@@ -604,7 +594,7 @@ export default function WalletPage() {
                   📸 {t('export_image')}
                 </Button>
                 <p className="text-xs text-gray-500">
-                  {t('long_press_save') || 'Если автоскачивание не началось — выше появится превью: сохраните долгим нажатием, через «Поделиться» или откройте во внешнем браузере.'}
+                  {t('long_press_save') || 'Если автоскачивание не началось — появится превью: сохраните долгим нажатием, через «Поделиться» или откройте во внешнем браузере.'}
                 </p>
               </div>
             </TabsContent>
@@ -635,8 +625,8 @@ export default function WalletPage() {
           </button>
         </div>
 
-        {/* ===== Overlay превью для iOS/WebView и универсального сценария ===== */}
-        {previewOpen && previewUrl && (
+        {/* ===== Overlay превью ===== */}
+        {previewOpen && (previewUrl || previewDataUrl || previewBlobUrl) && (
             <div className="fixed inset-0 z-[10000] bg-black/70 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-[720px] max-h-[90vh] flex flex-col">
                 <div className="flex items-center justify-between px-4 py-3 border-b">
@@ -645,9 +635,10 @@ export default function WalletPage() {
                     <X size={18} />
                   </button>
                 </div>
+
                 <div className="p-4 overflow-auto">
                   <img
-                      src={previewUrl}
+                      src={previewUrl || previewDataUrl || ''}
                       alt="Export preview"
                       className="max-w-full h-auto mx-auto rounded-lg border"
                   />
@@ -657,50 +648,71 @@ export default function WalletPage() {
                         : 'Если файл не скачался автоматически, сохраните изображение вручную или откройте во внешнем браузере.'}
                   </p>
                 </div>
-                <div className="flex flex-col gap-2 px-4 py-3 border-t sm:flex-row">
-                  <Button
-                      onClick={() => {
-                        // Android в Telegram WebView: скачивание часто заблокировано — открываем внешним браузером
-                        if ((isAndroid && isTelegramWV) && tgWebApp?.openLink && previewUrl) {
-                          tgWebApp.openLink(previewUrl);
-                          return;
-                        }
-                        // Иначе пробуем обычное скачивание
-                        if (previewUrl) {
-                          const a = document.createElement('a');
-                          a.href = previewUrl;
-                          a.download = 'manetka-stats.png';
-                          a.rel = 'noopener';
-                          a.target = '_blank';
-                          document.body.appendChild(a);
-                          a.click();
-                          setTimeout(() => document.body.removeChild(a), 0);
-                        }
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2"
-                  >
-                    <Download size={16} />
-                    {t('download') || 'Скачать'}
-                  </Button>
 
+                <div className="flex flex-col gap-2 px-4 py-3 border-t sm:flex-row">
+                  {/* Скачать: на Android+TG WV — реальная <a> на data:; иначе кнопка */}
+                  {isAndroid && isTelegramWV ? (
+                      <a
+                          href={previewDataUrl || previewUrl || '#'}
+                          download="manetka-stats.png"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 inline-flex items-center justify-center gap-2 rounded-md border border-transparent bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90 transition"
+                          style={{ backgroundColor: '#3b82f6', color: 'white' }}
+                      >
+                        <Download size={16} />
+                        {t('download') || 'Скачать'}
+                      </a>
+                  ) : (
+                      <Button
+                          onClick={() => {
+                            const href = previewBlobUrl || previewDataUrl || previewUrl;
+                            if (!href) return;
+                            const a = document.createElement('a');
+                            a.href = href;
+                            a.download = 'manetka-stats.png';
+                            a.rel = 'noopener';
+                            a.target = '_blank';
+                            document.body.appendChild(a);
+                            a.click();
+                            setTimeout(() => document.body.removeChild(a), 0);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2"
+                      >
+                        <Download size={16} />
+                        {t('download') || 'Скачать'}
+                      </Button>
+                  )}
+
+                  {/* Поделиться */}
                   <Button onClick={handleShare} variant="outline" className="flex-1">
                     {t('share') || 'Поделиться'}
                   </Button>
 
-                  <Button
-                      onClick={() => {
-                        if (!previewUrl) return;
-                        if (tgWebApp?.openLink) {
-                          tgWebApp.openLink(previewUrl);
-                        } else {
-                          window.open(previewUrl, '_blank', 'noopener,noreferrer');
-                        }
-                      }}
-                      variant="secondary"
-                      className="flex-1"
-                  >
-                    {t('open_external') || 'Открыть во внешнем браузере'}
-                  </Button>
+                  {/* Открыть во внешнем браузере: на Android+TG WV — реальная <a> на data: */}
+                  {isAndroid && isTelegramWV ? (
+                      <a
+                          href={previewDataUrl || previewUrl || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50 transition"
+                      >
+                        {t('open_external') || 'Открыть во внешнем браузере'}
+                      </a>
+                  ) : (
+                      <Button
+                          onClick={() => {
+                            const openUrl = previewBlobUrl || previewDataUrl || previewUrl;
+                            if (!openUrl) return;
+                            if (tgWebApp?.openLink) tgWebApp.openLink(openUrl);
+                            else window.open(openUrl, '_blank', 'noopener,noreferrer');
+                          }}
+                          variant="secondary"
+                          className="flex-1"
+                      >
+                        {t('open_external') || 'Открыть во внешнем браузере'}
+                      </Button>
+                  )}
                 </div>
               </div>
             </div>
