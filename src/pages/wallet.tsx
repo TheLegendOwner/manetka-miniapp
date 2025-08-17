@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -75,7 +75,7 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'balances' | 'stats'>('balances');
 
-  // Даты по умолчанию
+  // Даты (обновление таблицы — ТОЛЬКО по кнопке Apply)
   const [fromDate, setFromDate] = useState<Date | null>(new Date(2000, 0, 1));
   const [toDate, setToDate] = useState<Date | null>(new Date());
 
@@ -84,9 +84,8 @@ export default function WalletPage() {
 
   // ===== Экспорт / превью =====
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);           // универсальный для <img>
-  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);   // blob:
-  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);   // data:
+  const [previewImgUrl, setPreviewImgUrl] = useState<string | null>(null);     // dataURL для <img> превью
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);         // HTTPS ссылка с бэка (работает в Android/TG WV)
   const lastBlobRef = useRef<Blob | null>(null);
 
   const isIOS = typeof window !== 'undefined'
@@ -98,65 +97,22 @@ export default function WalletPage() {
   const tgWebApp = typeof window !== 'undefined' ? (window as any)?.Telegram?.WebApp : undefined;
   const isTelegramWV = !!tgWebApp;
 
-  // Показать тост, если вернулись с verified=1
+  // Тост после verified=1
   useEffect(() => {
     if (searchParams?.get('verified') === '1') {
       toast.success(t('wallet_added'));
     }
   }, [searchParams, t]);
 
-  // ===== Фетч статистики (только по кнопке + первый вход на вкладку) =====
-  const fetchRewardsStats = useCallback(async () => {
-    if (!token) return;
-    setStatsLoading(true);
-    try {
-      const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
-
-      const walletsToProcess =
-          selectedWalletId === 'all'
-              ? wallets
-              : wallets.filter((w: Wallet) => w.wallet_id === selectedWalletId);
-
-      const totalRewards = new Map<string, number>();
-
-      for (const w of walletsToProcess) {
-        let endpoint = `/api/rewards/${w.wallet_id}`;
-        if (fromDate && toDate) {
-          endpoint = `/api/rewards/${w.wallet_id}/between/${fmt(fromDate)}/${fmt(toDate)}`;
-        }
-
-        const res = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const { data: { rewards } }: RewardsResponse = await res.json();
-
-        rewards.forEach(r => {
-          totalRewards.set(r.token, (totalRewards.get(r.token) ?? 0) + r.amount);
-        });
-      }
-
-      const result = Array.from(totalRewards.entries()).map(([token, amount]) => ({ token, amount }));
-      setRewardsStats(result);
-    } catch (e) {
-      console.error('Failed to fetch reward stats', e);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, [token]); // важно: не зависим от дат/кошелька, вызывается вручную
-
-  // Основной фетч кошельков и агрегатов
-  const fetchWalletsAndData = useCallback(async () => {
+  // ===== Загрузка кошельков и агрегатов (балансы/реварды) =====
+  const fetchWalletsAndData = async () => {
     if (!token) return;
     setLoading(true);
     try {
-      // 1) wallets
-      const wRes = await fetch('/api/wallets', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const wRes = await fetch('/api/wallets', { headers: { Authorization: `Bearer ${token}` } });
       const wJson = await wRes.json();
       const fetchedWallets: Wallet[] = wJson?.data?.wallets ?? [];
 
-      // 2) агрегаты
       const walletsToProcess =
           selectedWalletId === 'all'
               ? fetchedWallets
@@ -169,12 +125,8 @@ export default function WalletPage() {
 
       for (const w of walletsToProcess) {
         const [bRes, rRes] = await Promise.all([
-          fetch(`/api/balances/${w.wallet_id}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          fetch(`/api/rewards/${w.wallet_id}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          })
+          fetch(`/api/balances/${w.wallet_id}`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`/api/rewards/${w.wallet_id}`, { headers: { Authorization: `Bearer ${token}` } })
         ]);
 
         const { data: { balances } }: BalancesResponse = await bRes.json();
@@ -209,14 +161,10 @@ export default function WalletPage() {
           }))
       );
 
-      // 3) в состояние — для UI
       setWallets(
           fetchedWallets.map((w: Wallet & { address?: string }) => ({
             ...w,
-            address:
-                w.address.slice(0, 6) +
-                '......' +
-                w.address.slice(w.address.length - 7, w.address.length - 1),
+            address: `${w.address.slice(0, 6)}......${w.address.slice(w.address.length - 7, w.address.length - 1)}`
           }))
       );
     } catch (e) {
@@ -224,30 +172,62 @@ export default function WalletPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, selectedWalletId]);
+  };
 
-  // Редирект, если не авторизованы
   useEffect(() => {
-    if (!authLoading && !token) {
-      router.replace('/');
-    }
+    if (!authLoading && !token) router.replace('/');
   }, [authLoading, token, router]);
 
-  // Первичная и последующие загрузки при смене выбранного кошелька
   useEffect(() => {
-    if (token) {
-      fetchWalletsAndData();
-    }
-  }, [token, selectedWalletId, fetchWalletsAndData]);
+    if (token) fetchWalletsAndData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, selectedWalletId]); // без циклов
 
-  // Первый вход на таб "Статистика" — один раз
+  // ===== Фетч статистики РЕВАРДОВ — только по кнопке Apply + один раз при первом заходе =====
   const hasLoadedStatsRef = useRef(false);
+
+  const fetchRewardsStats = async () => {
+    if (!token) return;
+    setStatsLoading(true);
+    try {
+      const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+
+      // читаем АКТУАЛЬНЫЕ значения из стейта на момент клика
+      const walletsToProcess =
+          selectedWalletId === 'all'
+              ? wallets
+              : wallets.filter((w: Wallet) => w.wallet_id === selectedWalletId);
+
+      const totalRewards = new Map<string, number>();
+
+      for (const w of walletsToProcess) {
+        let endpoint = `/api/rewards/${w.wallet_id}`;
+        if (fromDate && toDate) {
+          endpoint = `/api/rewards/${w.wallet_id}/between/${fmt(fromDate)}/${fmt(toDate)}`;
+        }
+        const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } });
+        const { data: { rewards } }: RewardsResponse = await res.json();
+        rewards.forEach(r => {
+          totalRewards.set(r.token, (totalRewards.get(r.token) ?? 0) + r.amount);
+        });
+      }
+
+      const result = Array.from(totalRewards.entries()).map(([token, amount]) => ({ token, amount }));
+      setRewardsStats(result);
+    } catch (e) {
+      console.error('Failed to fetch reward stats', e);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'stats' && !hasLoadedStatsRef.current) {
       hasLoadedStatsRef.current = true;
-      fetchRewardsStats(); // начальная загрузка один раз
+      fetchRewardsStats(); // начальная загрузка ОДИН раз
     }
-  }, [activeTab, fetchRewardsStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // ====== Экспорт изображения ======
   const handleExportImage = async () => {
@@ -299,7 +279,6 @@ export default function WalletPage() {
     const toStr = toDate ? format(toDate, "yyyy-MM-dd") : t("not_selected");
     dateLine.textContent = `${t('from')}: ${fromStr}  |  ${t('to')}: ${toStr}`;
 
-    // Клонируем таблицу
     const clonedTable = statsContainer.cloneNode(true) as HTMLElement;
 
     temp.appendChild(header);
@@ -308,12 +287,9 @@ export default function WalletPage() {
     document.body.appendChild(temp);
 
     try {
-      // Ждем шрифты
+      // Ждём шрифты
       // @ts-ignore
-      if (document.fonts?.ready) {
-        // @ts-ignore
-        await document.fonts.ready;
-      }
+      if (document.fonts?.ready) await document.fonts.ready;
 
       const scale = Math.max(2, Math.floor(window.devicePixelRatio || 2));
       const canvas = await html2canvas(temp, {
@@ -324,39 +300,45 @@ export default function WalletPage() {
         logging: false
       });
 
-      // blob + dataURL (для Android/TG WV)
+      // 1) превью для <img>
+      const dataUrl = canvas.toDataURL('image/png');
+      setPreviewImgUrl(dataUrl);
+
+      // 2) blob + загрузка на сервер → получить HTTPS ссылку (надёжно для Android/TG WV)
       const blob: Blob | null = await new Promise((resolve) =>
           canvas.toBlob((b) => resolve(b), 'image/png')
       );
+      lastBlobRef.current = blob || null;
 
-      let blobUrl: string | null = null;
-      let dataUrl: string | null = null;
-
+      let serverUrl: string | null = null;
       if (blob) {
-        lastBlobRef.current = blob;
-        blobUrl = URL.createObjectURL(blob);
+        const fileName = `manetka-stats_${fromStr}_${toStr}.png`.replace(/\s+/g, '_');
+        const fd = new FormData();
+        fd.append('file', blob, fileName);
+        fd.append('filename', fileName);
+        const resp = await fetch('/api/export-image', { method: 'POST', body: fd });
+        if (resp.ok) {
+          const json = await resp.json();
+          serverUrl = json?.url || null; // абсолютный URL
+        }
       }
-      dataUrl = canvas.toDataURL('image/png');
 
-      // Выбор универсальной ссылки для <img>
-      const universalUrl = blobUrl || dataUrl;
+      setDownloadUrl(serverUrl);
 
-      setPreviewBlobUrl(blobUrl);
-      setPreviewDataUrl(dataUrl);
-      setPreviewUrl(universalUrl);
-      setPreviewOpen(true);
-
-      // На десктопе вне WebView — автоскачивание
-      if (!isIOS && !isTelegramWV && universalUrl) {
+      // Автоскачивание на десктопе (вне WebView)
+      if (serverUrl && !isIOS && !isTelegramWV) {
         const a = document.createElement('a');
-        a.href = universalUrl;
-        a.download = `manetka-stats_${fromStr}_${toStr}.png`.replace(/\s+/g, '_');
-        a.rel = 'noopener';
+        a.href = serverUrl;
+        a.download = '';
         a.target = '_blank';
+        a.rel = 'noopener';
         document.body.appendChild(a);
         a.click();
         setTimeout(() => document.body.removeChild(a), 0);
       }
+
+      // Показываем оверлей
+      setPreviewOpen(true);
     } catch (e) {
       console.error("Export image failed", e);
       toast.error(t('export_failed') || 'Export failed');
@@ -365,54 +347,28 @@ export default function WalletPage() {
     }
   };
 
-  const handleClosePreview = () => {
-    if (previewBlobUrl?.startsWith('blob:')) URL.revokeObjectURL(previewBlobUrl);
-    setPreviewBlobUrl(null);
-    setPreviewDataUrl(null);
-    setPreviewUrl(null);
-    setPreviewOpen(false);
-    lastBlobRef.current = null;
-  };
-
-  // Надёжный share
   const handleShare = async () => {
     try {
       const blob = lastBlobRef.current;
-
-      if (blob) {
-        const file = new File([blob], 'manetka-stats.png', { type: 'image/png' });
-
-        // 1) Web Share API с файлами
-        if ((navigator as any).canShare?.({ files: [file] })) {
-          await (navigator as any).share({
-            files: [file],
-            title: 'MANETKA Wallet',
-            text: 'Rewards stats'
-          });
-          return;
-        }
-      }
-
-      // 2) Web Share API без файлов
-      if ((navigator as any).share) {
+      if (blob && (navigator as any).canShare?.({ files: [new File([blob], 'manetka-stats.png', { type: 'image/png' })] })) {
         await (navigator as any).share({
+          files: [new File([blob], 'manetka-stats.png', { type: 'image/png' })],
           title: 'MANETKA Wallet',
           text: 'Rewards stats'
-        }).catch(() => {});
-        // Откроем картинку во внешнем браузере
-        const openUrl = (isAndroid && isTelegramWV) ? (previewDataUrl || previewUrl) : (previewBlobUrl || previewDataUrl || previewUrl);
-        if (openUrl) {
-          if (tgWebApp?.openLink) tgWebApp.openLink(openUrl);
-          else window.open(openUrl, '_blank', 'noopener,noreferrer');
-        }
+        });
         return;
       }
-
-      // 3) Telegram WebView / нет share: открываем во внешнем браузере
-      const openUrl = (isAndroid && isTelegramWV) ? (previewDataUrl || previewUrl) : (previewBlobUrl || previewDataUrl || previewUrl);
-      if (openUrl) {
-        if (tgWebApp?.openLink) tgWebApp.openLink(openUrl);
-        else window.open(openUrl, '_blank', 'noopener,noreferrer');
+      // Фолбек — делимся ссылкой на файл (HTTPS)
+      if ((navigator as any).share && downloadUrl) {
+        await (navigator as any).share({ title: 'MANETKA Wallet', url: downloadUrl }).catch(() => {});
+        return;
+      }
+      // Telegram WebView / нет share → открыть во внешнем
+      if (downloadUrl) {
+        if (tgWebApp?.openLink) tgWebApp.openLink(downloadUrl);
+        else window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.info(t('long_press_save') || 'Сохраните изображение долгим нажатием.');
       }
     } catch (err) {
       console.error('Share failed', err);
@@ -429,17 +385,8 @@ export default function WalletPage() {
         {/* Header */}
         <div className="flex justify-between items-center px-5 py-4 border-b bg-white">
           <h1 className="text-lg font-semibold uppercase">{t('token_assets')}</h1>
-          <div
-              className="w-9 h-9 rounded-full overflow-hidden cursor-pointer"
-              onClick={() => router.push('/account')}
-          >
-            <NextImage
-                src={user?.photo_url || '/icons/avatar-default.svg'}
-                alt="avatar"
-                width={36}
-                height={36}
-                unoptimized
-            />
+          <div className="w-9 h-9 rounded-full overflow-hidden cursor-pointer" onClick={() => router.push('/account')}>
+            <NextImage src={user?.photo_url || '/icons/avatar-default.svg'} alt="avatar" width={36} height={36} unoptimized />
           </div>
         </div>
 
@@ -470,10 +417,7 @@ export default function WalletPage() {
             {/* BALANCES */}
             <TabsContent value="balances">
               {tokens.map(tok => (
-                  <div
-                      key={tok.token}
-                      className="flex flex-col justify-between bg-white border rounded-2xl px-4 py-3 shadow-sm space-y-4 mb-3"
-                  >
+                  <div key={tok.token} className="flex flex-col justify-between bg-white border rounded-2xl px-4 py-3 shadow-sm space-y-4 mb-3">
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-bold text-lg">{tok.token}</p>
@@ -507,16 +451,8 @@ export default function WalletPage() {
                         {fromDate ? format(fromDate, 'yyyy-MM-dd') : t('pick_date')}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                        className="w-auto p-0 z-[9999] bg-white shadow-xl border border-gray-200 rounded-md"
-                        align="start"
-                        sideOffset={4}
-                    >
-                      <Calendar
-                          mode="single"
-                          selected={fromDate ?? undefined}
-                          onSelect={(date) => setFromDate(date ?? null)}
-                      />
+                    <PopoverContent className="w-auto p-0 z-[9999] bg-white shadow-xl border border-gray-200 rounded-md" align="start" sideOffset={4}>
+                      <Calendar mode="single" selected={fromDate ?? undefined} onSelect={(date) => setFromDate(date ?? null)} />
                     </PopoverContent>
                   </Popover>
                 </div>
@@ -530,25 +466,14 @@ export default function WalletPage() {
                         {toDate ? format(toDate, 'yyyy-MM-dd') : t('pick_date')}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                        className="w-auto p-0 z-[9999] bg-white shadow-xl border border-gray-200 rounded-md"
-                        align="start"
-                        sideOffset={4}
-                    >
-                      <Calendar
-                          mode="single"
-                          selected={toDate ?? undefined}
-                          onSelect={(date) => setToDate(date ?? null)}
-                      />
+                    <PopoverContent className="w-auto p-0 z-[9999] bg-white shadow-xl border border-gray-200 rounded-md" align="start" sideOffset={4}>
+                      <Calendar mode="single" selected={toDate ?? undefined} onSelect={(date) => setToDate(date ?? null)} />
                     </PopoverContent>
                   </Popover>
                 </div>
 
-                {/* APPLY */}
-                <Button
-                    onClick={fetchRewardsStats}
-                    className="flex items-center gap-2 bg-[#EBB923] hover:bg-[#e2aa14] text-white"
-                >
+                {/* APPLY — единственный триггер загрузки */}
+                <Button onClick={fetchRewardsStats} className="flex items-center gap-2 bg-[#EBB923] hover:bg-[#e2aa14] text-white">
                   🔍 {t('apply')}
                 </Button>
               </div>
@@ -556,8 +481,7 @@ export default function WalletPage() {
               {/* Rewards Table */}
               <div className="space-y-2">
                 <div className="text-sm text-gray-600">
-                  {t('from')}: {fromDate ? format(fromDate, 'yyyy-MM-dd') : t('not_selected')} |{' '}
-                  {t('to')}: {toDate ? format(toDate, 'yyyy-MM-dd') : t('not_selected')}
+                  {t('from')}: {fromDate ? format(fromDate, 'yyyy-MM-dd') : t('not_selected')} | {t('to')}: {toDate ? format(toDate, 'yyyy-MM-dd') : t('not_selected')}
                 </div>
 
                 <div className="overflow-x-auto border rounded-xl p-4" id="stats-table">
@@ -580,9 +504,7 @@ export default function WalletPage() {
                         ))}
                         <tr className="font-bold bg-gray-50 border-t">
                           <td className="px-4 py-2">{t('total')}</td>
-                          <td className="px-4 py-2">
-                            {rewardsStats.reduce((acc, r) => acc + r.amount, 0).toFixed(4)} TON
-                          </td>
+                          <td className="px-4 py-2">{rewardsStats.reduce((acc, r) => acc + r.amount, 0).toFixed(4)} TON</td>
                         </tr>
                         </tbody>
                       </table>
@@ -594,7 +516,7 @@ export default function WalletPage() {
                   📸 {t('export_image')}
                 </Button>
                 <p className="text-xs text-gray-500">
-                  {t('long_press_save') || 'Если автоскачивание не началось — появится превью: сохраните долгим нажатием, через «Поделиться» или откройте во внешнем браузере.'}
+                  {t('long_press_save') || 'Если автоскачивание не началось — появится превью: сохраните, поделитесь или откройте во внешнем браузере.'}
                 </p>
               </div>
             </TabsContent>
@@ -626,62 +548,42 @@ export default function WalletPage() {
         </div>
 
         {/* ===== Overlay превью ===== */}
-        {previewOpen && (previewUrl || previewDataUrl || previewBlobUrl) && (
+        {previewOpen && (previewImgUrl || downloadUrl) && (
             <div className="fixed inset-0 z-[10000] bg-black/70 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-[720px] max-h-[90vh] flex flex-col">
                 <div className="flex items-center justify-between px-4 py-3 border-b">
                   <h3 className="font-semibold text-base">Preview</h3>
-                  <button onClick={handleClosePreview} className="p-2 rounded hover:bg-gray-100">
+                  <button onClick={() => setPreviewOpen(false)} className="p-2 rounded hover:bg-gray-100">
                     <X size={18} />
                   </button>
                 </div>
 
                 <div className="p-4 overflow-auto">
-                  <img
-                      src={previewUrl || previewDataUrl || ''}
-                      alt="Export preview"
-                      className="max-w-full h-auto mx-auto rounded-lg border"
-                  />
+                  {previewImgUrl ? (
+                      <img src={previewImgUrl} alt="Export preview" className="max-w-full h-auto mx-auto rounded-lg border" />
+                  ) : (
+                      <p className="text-center text-sm text-gray-500">Preview unavailable</p>
+                  )}
                   <p className="text-xs text-gray-500 mt-2 text-center">
-                    {isIOS
-                        ? 'Долгий тап по изображению, чтобы сохранить.'
-                        : 'Если файл не скачался автоматически, сохраните изображение вручную или откройте во внешнем браузере.'}
+                    {isIOS ? 'Долгий тап по изображению, чтобы сохранить.' : 'Можно скачать, поделиться или открыть во внешнем браузере.'}
                   </p>
                 </div>
 
                 <div className="flex flex-col gap-2 px-4 py-3 border-t sm:flex-row">
-                  {/* Скачать: на Android+TG WV — реальная <a> на data:; иначе кнопка */}
-                  {isAndroid && isTelegramWV ? (
+                  {/* Скачать: используем HTTPS ссылку с бэка */}
+                  {downloadUrl ? (
                       <a
-                          href={previewDataUrl || previewUrl || '#'}
-                          download="manetka-stats.png"
+                          href={downloadUrl}
+                          download
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 inline-flex items-center justify-center gap-2 rounded-md border border-transparent bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90 transition"
-                          style={{ backgroundColor: '#3b82f6', color: 'white' }}
+                          className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-blue-500 text-white px-4 py-2 text-sm font-medium hover:bg-blue-600 transition"
                       >
                         <Download size={16} />
                         {t('download') || 'Скачать'}
                       </a>
                   ) : (
-                      <Button
-                          onClick={() => {
-                            const href = previewBlobUrl || previewDataUrl || previewUrl;
-                            if (!href) return;
-                            const a = document.createElement('a');
-                            a.href = href;
-                            a.download = 'manetka-stats.png';
-                            a.rel = 'noopener';
-                            a.target = '_blank';
-                            document.body.appendChild(a);
-                            a.click();
-                            setTimeout(() => document.body.removeChild(a), 0);
-                          }}
-                          className="flex-1 flex items-center justify-center gap-2"
-                      >
-                        <Download size={16} />
-                        {t('download') || 'Скачать'}
-                      </Button>
+                      <Button disabled className="flex-1">{t('download') || 'Скачать'}</Button>
                   )}
 
                   {/* Поделиться */}
@@ -689,27 +591,25 @@ export default function WalletPage() {
                     {t('share') || 'Поделиться'}
                   </Button>
 
-                  {/* Открыть во внешнем браузере: на Android+TG WV — реальная <a> на data: */}
-                  {isAndroid && isTelegramWV ? (
+                  {/* Открыть во внешнем браузере */}
+                  {downloadUrl ? (
                       <a
-                          href={previewDataUrl || previewUrl || '#'}
+                          href={downloadUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex-1 inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50 transition"
+                          onClick={(e) => {
+                            // В TG WV попытаться явно открыть внешним браузером
+                            if (isTelegramWV && tgWebApp?.openLink) {
+                              e.preventDefault();
+                              tgWebApp.openLink(downloadUrl);
+                            }
+                          }}
                       >
                         {t('open_external') || 'Открыть во внешнем браузере'}
                       </a>
                   ) : (
-                      <Button
-                          onClick={() => {
-                            const openUrl = previewBlobUrl || previewDataUrl || previewUrl;
-                            if (!openUrl) return;
-                            if (tgWebApp?.openLink) tgWebApp.openLink(openUrl);
-                            else window.open(openUrl, '_blank', 'noopener,noreferrer');
-                          }}
-                          variant="secondary"
-                          className="flex-1"
-                      >
+                      <Button disabled variant="secondary" className="flex-1">
                         {t('open_external') || 'Открыть во внешнем браузере'}
                       </Button>
                   )}
