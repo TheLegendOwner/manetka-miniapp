@@ -15,7 +15,8 @@ import {
   Users,
   Share2,
   X,
-  Download
+  Download,
+  Link as LinkIcon
 } from 'lucide-react';
 import {
   Select,
@@ -90,7 +91,7 @@ export default function WalletPage() {
   const [rewardsStats, setRewardsStats] = useState<Array<{ token: string; amount: number }>>([]);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  // ===== Экспорт / превью =====
+  // Экспорт
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImgUrl, setPreviewImgUrl] = useState<string | null>(null); // dataURL для <img>
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);     // HTTPS ссылка с бэка
@@ -102,7 +103,7 @@ export default function WalletPage() {
       : false;
 
   const isAndroid = typeof window !== 'undefined' ? /Android/i.test(navigator.userAgent) : false;
-  const tgWebApp = typeof window !== 'undefined' ? (window as any)?.Telegram?.WebApp : undefined;
+  const tgWebApp = typeof window !== 'undefined' ? (window as any)?.Telegram?.WebApp : undefined; // не используем для открытия ссылок
   const isTelegramWV = !!tgWebApp;
 
   // Тост после verified=1
@@ -311,7 +312,7 @@ export default function WalletPage() {
       const dataUrl = canvas.toDataURL('image/png');
       setPreviewImgUrl(dataUrl);
 
-      // 2) blob -> отправляем на сервер Spring → получаем HTTPS ссылку
+      // 2) blob -> отправляем на сервер → получаем HTTPS ссылку
       const blob: Blob | null = await new Promise((resolve) =>
           canvas.toBlob((b) => resolve(b), 'image/png')
       );
@@ -332,12 +333,11 @@ export default function WalletPage() {
 
       setDownloadUrl(serverUrl);
 
-      // Десктоп вне WebView — автоскачивание
+      // Десктоп вне WebView — попробуем автоскачивание
       if (serverUrl && !isIOS && !isTelegramWV) {
         const a = document.createElement('a');
         a.href = serverUrl;
-        a.download = '';
-        a.target = '_blank';
+        a.target = '_self'; // важно — в том же окне
         a.rel = 'noopener';
         document.body.appendChild(a);
         a.click();
@@ -355,30 +355,25 @@ export default function WalletPage() {
 
   const handleShare = async () => {
     try {
-      const blob = lastBlobRef.current;
-      // 1) Share с файлами
-      if (blob) {
-        const file = new File([blob], 'manetka-stats.png', { type: 'image/png' });
-        if ((navigator as any).canShare?.({ files: [file] })) {
-          await (navigator as any).share({ files: [file], title: 'MANETKA Wallet', text: 'Rewards stats' });
+      // 1) Web Share API ссылкой (максимально совместимо)
+      if (downloadUrl && (navigator as any).share) {
+        try {
+          await (navigator as any).share({ title: 'MANETKA Wallet', url: downloadUrl });
           return;
+        } catch {
+          // юзер мог отменить — пойдём дальше к фолбекам
         }
       }
-      // 2) Share ссылкой
-      if (downloadUrl && (navigator as any).share) {
-        await (navigator as any).share({ title: 'MANETKA Wallet', url: downloadUrl }).catch(() => {});
-        return;
-      }
-      // 3) Фолбек: копируем ссылку, если возможно
-      if (downloadUrl && (navigator.clipboard?.writeText)) {
+      // 2) Копирование
+      if (downloadUrl && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(downloadUrl);
         toast.success(t('copied') || 'Ссылка скопирована');
         return;
       }
-      // 4) Фолбек: открыть во внешнем
+      // 3) Простой prompt — последний фолбек
       if (downloadUrl) {
-        if (isTelegramWV && tgWebApp?.openLink) tgWebApp.openLink(downloadUrl);
-        else window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+        // eslint-disable-next-line no-alert
+        window.prompt('Скопируйте ссылку:', downloadUrl);
         return;
       }
       toast.info(t('long_press_save') || 'Сохраните изображение долгим нажатием.');
@@ -453,7 +448,7 @@ export default function WalletPage() {
                       <NextImage src={tok.logo} alt={tok.token} width={64} height={64} />
                     </div>
                     <button
-                        onClick={() => window.open(tok.url, '_blank')}
+                        onClick={() => window.open(tok.url, '_self')}
                         className="w-full h-[40px] bg-[#EBB923] hover:bg-[#e2aa14] text-gray-900 font-semibold text-base rounded-full shadow-md"
                     >
                       {t('trade_button')}
@@ -562,18 +557,15 @@ export default function WalletPage() {
                   📸 {t('export_image')}
                 </Button>
                 <p className="text-xs text-gray-500">
-                  {t('long_press_save') || 'Если автоскачивание не началось — появится превью: сохраните, поделитесь или откройте во внешнем браузере.'}
+                  {t('long_press_save') || 'Если автоскачивание не началось — появится превью: сохраните, поделитесь или откройте в этом окне.'}
                 </p>
               </div>
             </TabsContent>
           </Tabs>
         </div>
 
-        {/* Bottom Nav — блокируем клики под модалкой */}
-        <div
-            className="fixed bottom-0 inset-x-0 border-t bg-white py-2 px-4 flex justify-between"
-            style={{ pointerEvents: previewOpen ? 'none' as const : 'auto' }}
-        >
+        {/* Bottom Nav */}
+        <div className="fixed bottom-0 inset-x-0 border-t bg-white py-2 px-4 flex justify-between">
           <button onClick={() => router.push('/wallet')} className="w-1/5 flex flex-col items-center text-[#EBB923]">
             <WalletIcon size={24} />
             <span className="text-xs">{t('wallet')}</span>
@@ -596,7 +588,7 @@ export default function WalletPage() {
           </button>
         </div>
 
-        {/* ===== Overlay превью — через Portal, запредельный z-index ===== */}
+        {/* ===== Overlay превью — Portal с максимальным z-index ===== */}
         {previewOpen && (
             <ModalPortal>
               <div
@@ -605,7 +597,6 @@ export default function WalletPage() {
               >
                 <div
                     className="bg-white rounded-2xl shadow-xl w-full max-w-[720px] max-h-[90vh] flex flex-col relative"
-                    style={{ pointerEvents: 'auto' }}
                     role="dialog"
                     aria-modal="true"
                 >
@@ -614,7 +605,6 @@ export default function WalletPage() {
                     <button
                         onClick={() => setPreviewOpen(false)}
                         className="p-2 rounded hover:bg-gray-100"
-                        style={{ pointerEvents: 'auto' }}
                     >
                       <X size={18} />
                     </button>
@@ -633,27 +623,22 @@ export default function WalletPage() {
                     <p className="text-xs text-gray-500 mt-2 text-center">
                       {isIOS
                           ? 'Долгий тап по изображению, чтобы сохранить.'
-                          : 'Можно скачать, поделиться или открыть во внешнем браузере.'}
+                          : 'Можно скачать, поделиться или открыть ссылку в этом окне.'}
                     </p>
                   </div>
 
                   <div className="flex flex-col gap-2 px-4 py-3 border-t sm:flex-row">
-                    {/* DOWNLOAD: реальная ссылка + onClick для Telegram */}
+                    {/* DOWNLOAD — <a href target="_self"> + дубль через location.href */}
                     <a
                         href={downloadUrl || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-blue-500 text-white px-4 py-2 text-sm font-medium hover:bg-blue-600 transition cursor-pointer"
-                        style={{ pointerEvents: 'auto' }}
+                        target="_self"
+                        className={`flex-1 inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition ${
+                            downloadUrl ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-200 text-gray-400 pointer-events-none'
+                        }`}
                         onClick={(e) => {
-                          if (!downloadUrl) {
-                            e.preventDefault();
-                            return;
-                          }
-                          if (isTelegramWV && (window as any)?.Telegram?.WebApp?.openLink) {
-                            e.preventDefault();
-                            (window as any).Telegram.WebApp.openLink(downloadUrl);
-                          }
+                          if (!downloadUrl) { e.preventDefault(); return; }
+                          // дубль для среды, где <a> может игнорироваться
+                          setTimeout(() => { try { window.location.href = downloadUrl; } catch {} }, 0);
                         }}
                     >
                       <Download size={16} />
@@ -661,34 +646,25 @@ export default function WalletPage() {
                     </a>
 
                     {/* SHARE */}
-                    <Button
-                        onClick={handleShare}
-                        variant="outline"
-                        className="flex-1 cursor-pointer"
-                        style={{ pointerEvents: 'auto' }}
-                    >
+                    <Button onClick={handleShare} variant="outline" className="flex-1">
                       {t('share') || 'Поделиться'}
                     </Button>
 
-                    {/* OPEN EXTERNAL: реальная ссылка + onClick для Telegram */}
+                    {/* OPEN IN THIS WINDOW — надёжно для Android/TG WV */}
                     <a
                         href={downloadUrl || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50 transition cursor-pointer"
-                        style={{ pointerEvents: 'auto' }}
+                        target="_self"
+                        className={`flex-1 inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50 transition ${
+                            downloadUrl ? '' : 'pointer-events-none opacity-50'
+                        }`}
                         onClick={(e) => {
-                          if (!downloadUrl) {
-                            e.preventDefault();
-                            return;
-                          }
-                          if (isTelegramWV && (window as any)?.Telegram?.WebApp?.openLink) {
-                            e.preventDefault();
-                            (window as any).Telegram.WebApp.openLink(downloadUrl);
-                          }
+                          if (!downloadUrl) { e.preventDefault(); return; }
+                          // дубль
+                          setTimeout(() => { try { window.location.href = downloadUrl; } catch {} }, 0);
                         }}
                     >
-                      {t('open_external') || 'Открыть во внешнем браузере'}
+                      <LinkIcon size={16} />
+                      {t('open_external') || 'Открыть ссылку здесь'}
                     </a>
                   </div>
                 </div>
