@@ -1,11 +1,16 @@
+# MANETKA Wallet
 
-  # NEW MANETKA Wallet Mobile App
+Telegram Mini App для подключения TON-кошелька, просмотра баланса и токенов, управления рефералами.
 
-  This is a code bundle for NEW MANETKA Wallet Mobile App. The original project is available at https://www.figma.com/design/aicRw1B4USpC5zuPKh5L7e/NEW-MANETKA-Wallet-Mobile-App.
+## 🚀 Стек
+- Next.js 14
+- React + TypeScript
+- Tailwind CSS
+- TonConnect UI SDK
+- Telegram WebApp SDK
 
-  ## Running the code
+## 🧩 Установка
 
-  Run `npm i` to install the dependencies.
-
-  Run `npm run dev` to start the development server.
-  
+```bash
+npm install
+npm run dev
